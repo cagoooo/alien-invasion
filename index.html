@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>外星人入侵 · 保衛石門 ｜ 石門國小</title>
+<style>
+  :root {
+    --neon: #4af0ff;
+    --neon-pink: #ff4ec7;
+    --neon-green: #6dff8c;
+    --bg-0: #05030f;
+    --bg-1: #0d0930;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: radial-gradient(circle at 50% 0%, var(--bg-1), var(--bg-0) 70%);
+    color: #eaf6ff;
+    font-family: "Trebuchet MS", "Noto Sans TC", system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px;
+  }
+  #stage {
+    position: relative;
+    width: min(96vw, calc((100vh - 70px) * 0.75));
+    aspect-ratio: 600 / 800;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 0 0 2px rgba(74,240,255,0.35),
+                0 0 40px rgba(74,240,255,0.25),
+                inset 0 0 60px rgba(13,9,48,0.8);
+    background: #05030f;
+  }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  /* ---------- 疊層畫面（選單 / 暫停 / 結束） ---------- */
+  .screen {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; gap: 14px;
+    padding: 20px;
+    background: rgba(5,3,15,0.82);
+    backdrop-filter: blur(3px);
+    z-index: 5;
+  }
+  .screen.hidden { display: none; }
+  .title {
+    font-size: clamp(30px, 8vw, 58px);
+    font-weight: 900; letter-spacing: 2px; line-height: 1.05;
+    color: #fff;
+    text-shadow: 0 0 12px var(--neon), 0 0 28px var(--neon);
+  }
+  .title .en {
+    display: block;
+    font-size: clamp(12px, 3vw, 18px);
+    letter-spacing: 8px; margin-top: 6px;
+    color: var(--neon); text-shadow: none; opacity: .85;
+  }
+  .subtitle { font-size: clamp(13px, 3.4vw, 16px); color: #b9c8e6; line-height: 1.7; max-width: 360px; }
+  .subtitle b { color: var(--neon-green); }
+  kbd {
+    display: inline-block; min-width: 22px; padding: 2px 7px; margin: 0 1px;
+    border-radius: 6px; font-size: 12px; font-family: inherit;
+    background: #1a1640; border: 1px solid #3a3470; border-bottom-width: 3px;
+    color: #dfe9ff;
+  }
+  .btn {
+    cursor: pointer; border: none; outline: none;
+    font-family: inherit; font-weight: 800; letter-spacing: 1px;
+    font-size: clamp(16px, 4.5vw, 21px);
+    color: #05030f;
+    padding: 13px 38px; border-radius: 999px;
+    background: linear-gradient(135deg, var(--neon), var(--neon-green));
+    box-shadow: 0 6px 20px rgba(74,240,255,0.4);
+    transition: transform .08s ease, box-shadow .15s ease;
+  }
+  .btn:active { transform: translateY(2px) scale(.98); box-shadow: 0 3px 10px rgba(74,240,255,0.3); }
+  .btn.secondary {
+    background: transparent; color: var(--neon);
+    box-shadow: inset 0 0 0 2px rgba(74,240,255,0.5);
+  }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .stat-line { font-size: clamp(14px, 4vw, 18px); color: #fff; }
+  .stat-line .big { font-size: clamp(28px, 8vw, 44px); font-weight: 900; color: var(--neon-pink); text-shadow: 0 0 14px var(--neon-pink); }
+  .hint-mobile { font-size: 12px; color: #8fa2c8; }
+  .alien-deco { font-size: 40px; filter: drop-shadow(0 0 10px var(--neon-green)); animation: bob 2.4s ease-in-out infinite; }
+  @keyframes bob { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-10px) } }
+  .school-badge { width: clamp(78px, 21vw, 122px); height: auto;
+    filter: drop-shadow(0 0 16px rgba(74,240,255,0.5)); animation: bob 3s ease-in-out infinite; }
+
+  /* ---------- 難度選擇 ---------- */
+  .diff-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .diff-label { font-size: 13px; color: #8fa2c8; margin-right: 2px; }
+  .diff-btn {
+    cursor: pointer; font-family: inherit; font-weight: 700; font-size: 14px;
+    color: #b9c8e6; padding: 7px 17px; border-radius: 999px;
+    background: rgba(26,22,64,0.6); border: 1px solid #3a3470; transition: all .15s ease;
+  }
+  .diff-btn.active { color: #05030f; background: var(--neon); border-color: var(--neon); box-shadow: 0 0 14px rgba(74,240,255,0.5); }
+  .diff-btn[data-diff="easy"].active { background: var(--neon-green); border-color: var(--neon-green); box-shadow: 0 0 14px rgba(109,255,140,0.5); }
+  .diff-btn[data-diff="hard"].active { background: var(--neon-pink); border-color: var(--neon-pink); box-shadow: 0 0 14px rgba(255,78,199,0.5); }
+
+  /* ---------- 名人堂排行榜 ---------- */
+  .leaderboard { width: min(320px, 82%); display: flex; flex-direction: column; gap: 3px; }
+  .lb-title { font-size: 13px; color: #ffd24a; letter-spacing: 2px; margin-bottom: 3px; }
+  .lb-row { display: flex; align-items: center; gap: 8px; font-size: 14px;
+    background: rgba(13,9,48,0.55); border-radius: 7px; padding: 5px 12px; }
+  .lb-rank { width: 22px; text-align: center; }
+  .lb-name { flex: 1; text-align: left; color: #eaf6ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-score { color: var(--neon); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .lb-empty { font-size: 12px; color: #6f7fa6; padding: 6px; }
+
+  /* ---------- 留名輸入 ---------- */
+  .name-entry { display: flex; flex-direction: column; gap: 9px; align-items: center;
+    background: rgba(255,210,74,0.08); border: 1px solid rgba(255,210,74,0.4);
+    border-radius: 14px; padding: 13px 18px; }
+  .name-entry.hidden { display: none; }
+  .name-entry .ne-title { font-size: 14px; color: #ffd24a; font-weight: 800; }
+  .name-row { display: flex; gap: 8px; }
+  .name-input {
+    font-family: inherit; font-size: 16px; color: #fff; text-align: center;
+    width: 150px; padding: 9px 12px; border-radius: 10px;
+    background: #0d0930; border: 1px solid #3a3470; outline: none;
+  }
+  .name-input:focus { border-color: var(--neon); }
+
+  /* ---------- 音效開關 ---------- */
+  .sound-toggle {
+    position: absolute; top: 10px; right: 10px; z-index: 6;
+    cursor: pointer; width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 17px;
+    background: rgba(13,9,48,0.7); border: 1px solid #3a3470; color: #eaf6ff;
+  }
+  .sound-toggle:active { transform: scale(0.92); }
+
+  /* ---------- 頁尾署名 ---------- */
+  .site-credit {
+    text-align: center; font-size: 12px;
+    color: rgba(190,205,235,0.65);
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  .site-credit__heart { display: inline-block; margin: 0 2px; filter: saturate(1.1); }
+  .site-credit__author {
+    color: var(--neon); text-decoration: none;
+    border-bottom: 1px dotted currentColor; padding-bottom: 1px;
+    transition: color .2s, border-color .2s;
+  }
+  .site-credit__author:hover { color: var(--neon-green); border-bottom-color: var(--neon-green); }
+  .credit-small { font-size: 11px; color: #6f7fa6; margin-top: 4px; }
+  .credit-small a { color: #9ab0dd; text-decoration: none; border-bottom: 1px dotted currentColor; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="game" width="600" height="800"></canvas>
+    <button class="sound-toggle" id="soundToggle" title="音效開關 (M)">🔊</button>
+
+    <!-- 開始選單 -->
+    <div class="screen" id="menu">
+      <img id="schoolBadge" class="school-badge" alt="石門國小校徽" />
+      <h1 class="title">外星人入侵<span class="en">保衛石門 · DEFEND SHIH MEN</span></h1>
+      <p class="subtitle">
+        外星艦隊入侵桃園上空！<b>石門國小防衛隊</b>，起飛迎戰 🛸<br>
+        <b>電腦</b> <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 移動·自動開火 · <kbd>P</kbd> 暫停<br>
+        <span class="hint-mobile"><b>手機</b> 手指滑動操控戰機</span>
+      </p>
+      <div class="diff-group">
+        <span class="diff-label">難度</span>
+        <button class="diff-btn" data-diff="easy">簡單</button>
+        <button class="diff-btn active" data-diff="normal">普通</button>
+        <button class="diff-btn" data-diff="hard">困難</button>
+      </div>
+      <button class="btn" id="startBtn">開始遊戲 ▶</button>
+      <div class="leaderboard">
+        <div class="lb-title">🏆 名人堂 TOP 5</div>
+        <div id="menuLeaderboard"></div>
+      </div>
+      <p class="credit-small">桃園市龍潭區石門國民小學 · 鱻魚特色學園</p>
+    </div>
+
+    <!-- 暫停 -->
+    <div class="screen hidden" id="pause">
+      <h1 class="title" style="font-size:clamp(26px,7vw,44px)">暫停中</h1>
+      <p class="subtitle">深呼吸，外星人在等你。</p>
+      <div class="row">
+        <button class="btn" id="resumeBtn">繼續 ▶</button>
+        <button class="btn secondary" id="quitBtn">回主選單</button>
+      </div>
+    </div>
+
+    <!-- 過關 -->
+    <div class="screen hidden" id="levelup">
+      <div class="alien-deco" style="animation:none">🎉</div>
+      <h1 class="title" id="levelupTitle" style="font-size:clamp(26px,7vw,46px)">第 1 波 清除！</h1>
+      <p class="subtitle" id="levelupMsg">準備迎接下一波攻勢…</p>
+    </div>
+
+    <!-- 結束 -->
+    <div class="screen hidden" id="gameover">
+      <div class="alien-deco" style="animation:none">💥</div>
+      <h1 class="title" id="goTitle" style="font-size:clamp(26px,7vw,46px)">遊戲結束</h1>
+      <p class="stat-line">本次得分 <span class="big" id="finalScore">0</span></p>
+      <p class="subtitle">最高分：<b id="finalHigh">0</b> · 抵達第 <b id="finalLevel">1</b> 波</p>
+      <div class="name-entry hidden" id="nameEntry">
+        <span class="ne-title">🎉 擠進名人堂！留下你的名字</span>
+        <div class="name-row">
+          <input class="name-input" id="nameInput" maxlength="10" placeholder="輸入暱稱" autocomplete="off" />
+          <button class="btn" id="saveName" style="padding:9px 22px;font-size:15px">儲存</button>
+        </div>
+      </div>
+      <div class="leaderboard">
+        <div class="lb-title">🏆 名人堂 TOP 5</div>
+        <div id="goLeaderboard"></div>
+      </div>
+      <div class="row">
+        <button class="btn" id="restartBtn">再戰一場 ↻</button>
+        <button class="btn secondary" id="menuBtn">回主選單</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-credit">
+    Made with <span class="site-credit__heart" aria-label="愛心">❤️</span> by
+    <a href="https://www.smes.tyc.edu.tw/modules/tadnews/page.php?ncsn=11&nsn=16#a5"
+       target="_blank" rel="noopener noreferrer" class="site-credit__author">阿凱老師</a>
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* =========================================================================
+   外星人入侵 Alien Invasion — 單檔 HTML5 Canvas 射擊遊戲
+   Made with ❤️ by 阿凱老師（桃園市龍潭區石門國民小學）
+   ========================================================================= */
+
+const W = 600, H = 800;                       // 邏輯解析度
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+// ---------- 工具函式 ----------
+const rand  = (a, b) => a + Math.random() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const pick  = arr => arr[randi(0, arr.length - 1)];
+const aabb  = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+// =========================================================================
+//  音效（Web Audio 合成，零外部檔案）
+// =========================================================================
+const Sound = (() => {
+  let ctxA = null, muted = false;
+  function ac() {
+    if (!ctxA) { try { ctxA = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+    return ctxA;
+  }
+  function tone(freq, dur, type = "square", vol = 0.18, slideTo = null) {
+    if (muted) return;
+    const a = ac(); if (!a) return;
+    const t = a.currentTime;
+    const osc = a.createOscillator(), g = a.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(g).connect(a.destination);
+    osc.start(t); osc.stop(t + dur);
+  }
+  function noise(dur, vol = 0.25) {
+    if (muted) return;
+    const a = ac(); if (!a) return;
+    const t = a.currentTime;
+    const len = Math.floor(a.sampleRate * dur);
+    const buf = a.createBuffer(1, len, a.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = a.createBufferSource(); src.buffer = buf;
+    const g = a.createGain(); g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    const f = a.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 1200;
+    src.connect(f).connect(g).connect(a.destination);
+    src.start(t);
+  }
+  return {
+    resume() { const a = ac(); if (a && a.state === "suspended") a.resume(); },
+    toggle() { muted = !muted; return muted; },
+    isMuted() { return muted; },
+    shoot()    { tone(880, 0.08, "square", 0.05, 1400); },
+    hit()      { tone(220, 0.06, "sawtooth", 0.10, 140); },
+    explode()  { noise(0.32, 0.30); tone(120, 0.3, "sawtooth", 0.10, 50); },
+    powerup()  { tone(523, 0.09, "triangle", 0.18); setTimeout(()=>tone(784,0.09,"triangle",0.18),90); setTimeout(()=>tone(1047,0.14,"triangle",0.18),180); },
+    hurt()     { noise(0.2, 0.3); tone(160, 0.25, "square", 0.18, 60); },
+    levelup()  { [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,0.14,"triangle",0.18),i*90)); },
+    boss()     { tone(70, 0.6, "sawtooth", 0.22, 45); },
+    over()     { [440,330,262,196].forEach((f,i)=>setTimeout(()=>tone(f,0.3,"sawtooth",0.18),i*160)); },
+  };
+})();
+
+// =========================================================================
+//  外星人像素圖（'1' = 實心格）
+// =========================================================================
+const SPRITES = {
+  scout: [   // 偵察兵（小、1 血）
+    "00011000",
+    "00111100",
+    "01111110",
+    "11100111",
+    "11111111",
+    "00100100",
+    "01011010",
+    "10100101",
+  ],
+  fighter: [ // 戰鬥機（中、2 血）
+    "00100000100",
+    "10010001001",
+    "10111111101",
+    "11101110111",
+    "11111111111",
+    "01111111110",
+    "00100000100",
+    "01000000010",
+  ],
+  bomber: [  // 轟炸機（大、4 血）
+    "000011110000",
+    "011111111110",
+    "111111111111",
+    "111001100111",
+    "111111111111",
+    "000110011000",
+    "001100110011",
+    "110000000011",
+  ],
+};
+function drawSprite(rows, x, y, cell, color, glow) {
+  ctx.save();
+  if (glow) { ctx.shadowColor = color; ctx.shadowBlur = 8; }
+  ctx.fillStyle = color;
+  for (let r = 0; r < rows.length; r++)
+    for (let c = 0; c < rows[r].length; c++)
+      if (rows[r][c] === "1") ctx.fillRect(x + c * cell, y + r * cell, cell, cell);
+  ctx.restore();
+}
+const spriteSize = (rows, cell) => ({ w: rows[0].length * cell, h: rows.length * cell });
+
+// =========================================================================
+//  外星人種類設定
+// =========================================================================
+const ALIEN_TYPES = {
+  scout:   { hp: 1, points: 100, color: "#6dff8c", cell: 4, fire: 0.0006, bulletSpeed: 4.2, drop: 0.10 },
+  fighter: { hp: 2, points: 150, color: "#4af0ff", cell: 4, fire: 0.0014, bulletSpeed: 4.8, drop: 0.14 },
+  bomber:  { hp: 4, points: 280, color: "#ff7ad9", cell: 4, fire: 0.0022, bulletSpeed: 5.4, drop: 0.20 },
+};
+
+// =========================================================================
+//  難度設定（影響起始命數、敵人開火率、移動 / 子彈速度）
+// =========================================================================
+const DIFFICULTY = {
+  easy:   { name: "簡單", lives: 5, fire: 0.55, speed: 0.78, bspeed: 0.82, color: "#6dff8c" },
+  normal: { name: "普通", lives: 3, fire: 1.00, speed: 1.00, bspeed: 1.00, color: "#4af0ff" },
+  hard:   { name: "困難", lives: 2, fire: 1.70, speed: 1.28, bspeed: 1.22, color: "#ff4ec7" },
+};
+const diff = () => DIFFICULTY[G.difficulty];
+
+// =========================================================================
+//  全域遊戲狀態
+// =========================================================================
+const G = {
+  state: "menu",            // menu | playing | paused | levelup | gameover
+  score: 0, level: 1, lives: 3,
+  difficulty: "normal",     // easy | normal | hard
+  high: +(localStorage.getItem("alienInvasionHigh") || 0),
+  weapon: 1,                // 1~3 火力等級
+  combo: 0, comboTimer: 0,
+  shake: 0,
+  rapidTimer: 0, shieldTimer: 0,
+  formationDir: 1, formationSpeed: 0.5, stepDown: 0,
+};
+
+// 實體陣列
+let player, aliens = [], bullets = [], eBullets = [], particles = [],
+    powerups = [], floaters = [], stars = [], boss = null;
+
+// =========================================================================
+//  星空背景
+// =========================================================================
+function initStars() {
+  stars = [];
+  for (let i = 0; i < 110; i++) {
+    const layer = randi(0, 2);
+    stars.push({
+      x: rand(0, W), y: rand(0, H),
+      s: [0.6, 1.1, 1.8][layer],
+      v: [0.25, 0.6, 1.2][layer],
+      c: ["#4a5a90", "#9fb6e6", "#ffffff"][layer],
+    });
+  }
+}
+function updateStars() {
+  for (const st of stars) {
+    st.y += st.v;
+    if (st.y > H) { st.y = -2; st.x = rand(0, W); }
+  }
+}
+function drawStars() {
+  for (const st of stars) { ctx.fillStyle = st.c; ctx.fillRect(st.x, st.y, st.s, st.s); }
+}
+
+// =========================================================================
+//  玩家戰機
+// =========================================================================
+function makePlayer() {
+  player = {
+    x: W / 2 - 22, y: H - 90, w: 44, h: 40,
+    speed: 6.2, fireCd: 0, invuln: 0, targetX: null,
+  };
+}
+function drawShip(p) {
+  const cx = p.x + p.w / 2, x = p.x, y = p.y, w = p.w, h = p.h;
+  // 護盾
+  if (G.shieldTimer > 0 || p.invuln > 0) {
+    ctx.save();
+    const on = G.shieldTimer > 0;
+    ctx.strokeStyle = on ? "rgba(109,255,140,0.9)" : "rgba(74,240,255,0.7)";
+    ctx.lineWidth = 2;
+    ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 12;
+    ctx.globalAlpha = on ? 0.9 : (Math.floor(p.invuln / 4) % 2 ? 0.3 : 0.8);
+    ctx.beginPath(); ctx.arc(cx, y + h / 2, w * 0.82, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  if (p.invuln > 0 && G.shieldTimer <= 0 && Math.floor(p.invuln / 4) % 2) return; // 受傷閃爍
+  // 引擎尾焰
+  ctx.save();
+  const flame = rand(6, 14);
+  const grd = ctx.createLinearGradient(0, y + h, 0, y + h + flame);
+  grd.addColorStop(0, "rgba(74,240,255,0.9)"); grd.addColorStop(1, "rgba(74,240,255,0)");
+  ctx.fillStyle = grd;
+  ctx.beginPath();
+  ctx.moveTo(cx - 7, y + h - 4); ctx.lineTo(cx, y + h + flame); ctx.lineTo(cx + 7, y + h - 4);
+  ctx.fill();
+  // 機身
+  ctx.shadowColor = "#4af0ff"; ctx.shadowBlur = 10;
+  ctx.fillStyle = "#e9f7ff";
+  ctx.beginPath();
+  ctx.moveTo(cx, y);
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(cx + 10, y + h - 8);
+  ctx.lineTo(cx - 10, y + h - 8);
+  ctx.lineTo(x, y + h);
+  ctx.closePath(); ctx.fill();
+  // 駕駛艙
+  ctx.shadowBlur = 0; ctx.fillStyle = "#1f7bff";
+  ctx.beginPath(); ctx.arc(cx, y + h * 0.5, 5, 0, Math.PI * 2); ctx.fill();
+  // 機翼火力標示
+  ctx.fillStyle = "#ff4ec7";
+  ctx.fillRect(x + 3, y + h - 12, 5, 8);
+  ctx.fillRect(x + w - 8, y + h - 12, 5, 8);
+  ctx.restore();
+}
+
+// =========================================================================
+//  建立一波外星艦隊
+// =========================================================================
+function spawnWave(level) {
+  aliens = []; boss = null;
+  if (level % 5 === 0) { spawnBoss(level); return; }
+
+  const cols = Math.min(9, 5 + Math.floor(level / 2));
+  const rows = Math.min(5, 2 + Math.floor((level + 1) / 2));
+  const marginX = 60, gapX = (W - marginX * 2) / cols;
+  const startY = 90, gapY = 56;
+
+  for (let r = 0; r < rows; r++) {
+    // 上排較硬、下排較弱
+    let type = "scout";
+    if (r === 0 && rows >= 3) type = "bomber";
+    else if (r <= 1) type = "fighter";
+    const def = ALIEN_TYPES[type];
+    const sz = spriteSize(SPRITES[type], def.cell);
+    for (let c = 0; c < cols; c++) {
+      aliens.push({
+        type, hp: def.hp, maxHp: def.hp,
+        x: marginX + c * gapX + (gapX - sz.w) / 2,
+        y: startY + r * gapY,
+        w: sz.w, h: sz.h,
+        col: c, baseY: startY + r * gapY,
+        wob: rand(0, Math.PI * 2),
+        flash: 0,
+      });
+    }
+  }
+  G.formationDir = 1;
+  G.formationSpeed = (0.45 + level * 0.07) * diff().speed;
+  G.stepDown = 0;
+}
+
+function spawnBoss(level) {
+  const hp = 60 + level * 22;
+  boss = {
+    x: W / 2 - 90, y: -160, w: 180, h: 110,
+    hp, maxHp: hp,
+    dir: 1, speed: (1.4 + level * 0.05) * diff().speed,
+    fireCd: 60, pattern: 0, patternTimer: 0,
+    entering: true, flash: 0, t: 0,
+  };
+  Sound.boss();
+}
+
+// =========================================================================
+//  射擊
+// =========================================================================
+function playerShoot() {
+  const cx = player.x + player.w / 2, y = player.y - 4;
+  const spd = -11;
+  const mk = (x, vx) => bullets.push({ x: x - 2.5, y, w: 5, h: 14, vx: vx || 0, vy: spd, dmg: 1 });
+  if (G.weapon === 1) mk(cx, 0);
+  else if (G.weapon === 2) { mk(cx - 9, 0); mk(cx + 9, 0); }
+  else { mk(cx, 0); mk(cx - 12, -2.2); mk(cx + 12, 2.2); }
+  Sound.shoot();
+}
+function alienShoot(a) {
+  const def = ALIEN_TYPES[a.type];
+  eBullets.push({ x: a.x + a.w / 2 - 3, y: a.y + a.h, w: 6, h: 14, vy: def.bulletSpeed * diff().bspeed, type: "norm" });
+}
+
+// =========================================================================
+//  粒子 / 爆炸 / 飄字
+// =========================================================================
+function burst(x, y, color, n = 14, power = 4) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, Math.PI * 2), sp = rand(1, power);
+    particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      life: rand(20, 40), max: 40, color, size: rand(1.5, 3.5) });
+  }
+}
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vx *= 0.95; p.vy *= 0.95; p.vy += 0.04; p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+function floatText(x, y, text, color) { floaters.push({ x, y, text, color, life: 50 }); }
+function updateFloaters() {
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i]; f.y -= 0.7; f.life--;
+    if (f.life <= 0) floaters.splice(i, 1);
+  }
+}
+function drawFloaters() {
+  ctx.save(); ctx.textAlign = "center"; ctx.font = "bold 16px 'Trebuchet MS', sans-serif";
+  for (const f of floaters) {
+    ctx.globalAlpha = clamp(f.life / 50, 0, 1);
+    ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.restore(); ctx.globalAlpha = 1;
+}
+
+// =========================================================================
+//  道具
+// =========================================================================
+const POWER_DEFS = {
+  spread: { color: "#ffd24a", label: "▲", name: "火力強化" },
+  rapid:  { color: "#4af0ff", label: "»",  name: "急速射擊" },
+  shield: { color: "#6dff8c", label: "◈", name: "能量護盾" },
+  life:   { color: "#ff4ec7", label: "♥", name: "增加戰機" },
+};
+function maybeDropPower(x, y, chance) {
+  if (Math.random() > chance) return;
+  let type;
+  const roll = Math.random();
+  if (roll < 0.06) type = "life";
+  else if (roll < 0.40) type = "spread";
+  else if (roll < 0.72) type = "rapid";
+  else type = "shield";
+  powerups.push({ x: x - 13, y, w: 26, h: 26, vy: 1.8, type, t: 0 });
+}
+function applyPower(type) {
+  Sound.powerup();
+  const d = POWER_DEFS[type];
+  floatText(player.x + player.w / 2, player.y - 10, d.name, d.color);
+  if (type === "spread") G.weapon = Math.min(3, G.weapon + 1);
+  else if (type === "rapid") G.rapidTimer = 60 * 8;
+  else if (type === "shield") G.shieldTimer = 60 * 7;
+  else if (type === "life") { G.lives = Math.min(5, G.lives + 1); }
+}
+function drawPowerup(p) {
+  const d = POWER_DEFS[p.type], cx = p.x + p.w / 2, cy = p.y + p.h / 2;
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(Math.sin(p.t * 0.08) * 0.3);
+  ctx.shadowColor = d.color; ctx.shadowBlur = 14;
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.strokeStyle = d.color; ctx.lineWidth = 2;
+  ctx.beginPath();
+  const R = 13;
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 3 * i - Math.PI / 6;
+    const px = Math.cos(a) * R, py = Math.sin(a) * R;
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.shadowBlur = 0; ctx.fillStyle = d.color;
+  ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(d.label, 0, 1);
+  ctx.restore();
+}
+
+// =========================================================================
+//  輸入
+// =========================================================================
+const keys = {};
+addEventListener("keydown", e => {
+  if (e.target && e.target.tagName === "INPUT") return;   // 輸入暱稱時不攔截
+  if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].includes(e.key)) e.preventDefault();
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === "p" || e.key === "P") togglePause();
+  if (e.key === "m" || e.key === "M") setMute(Sound.toggle());
+  if (e.key === "Enter") {
+    if (G.state === "menu") startGame();
+    else if (G.state === "gameover") startGame();
+  }
+});
+addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
+
+// 指標（滑鼠 + 觸控）
+function pointerMove(clientX) {
+  if (G.state !== "playing" || !player) return;
+  const rect = canvas.getBoundingClientRect();
+  const lx = (clientX - rect.left) / rect.width * W;
+  player.targetX = clamp(lx - player.w / 2, 0, W - player.w);
+}
+canvas.addEventListener("pointerdown", e => { Sound.resume(); pointerMove(e.clientX); });
+canvas.addEventListener("pointermove", e => { if (e.pressure > 0 || e.buttons || e.pointerType === "touch") pointerMove(e.clientX); });
+canvas.addEventListener("touchmove", e => { e.preventDefault(); pointerMove(e.touches[0].clientX); }, { passive: false });
+
+// =========================================================================
+//  生命週期：開始 / 暫停 / 結束
+// =========================================================================
+const $ = id => document.getElementById(id);
+function show(id) { ["menu","pause","levelup","gameover"].forEach(s => $(s).classList.toggle("hidden", s !== id)); }
+function hideAll() { ["menu","pause","levelup","gameover"].forEach(s => $(s).classList.add("hidden")); }
+
+function startGame() {
+  Sound.resume();
+  G.state = "playing"; G.score = 0; G.level = 1; G.lives = diff().lives;
+  G.weapon = 1; G.combo = 0; G.comboTimer = 0; G.shake = 0;
+  G.rapidTimer = 0; G.shieldTimer = 0;
+  bullets = []; eBullets = []; particles = []; powerups = []; floaters = [];
+  makePlayer(); spawnWave(1); hideAll();
+}
+function togglePause() {
+  if (G.state === "playing") { G.state = "paused"; show("pause"); }
+  else if (G.state === "paused") { G.state = "playing"; hideAll(); }
+}
+function nextLevel() {
+  G.level++;
+  G.state = "levelup";
+  const boss5 = G.level % 5 === 0;
+  $("levelupTitle").textContent = boss5 ? "⚠ 母艦來襲！" : `第 ${G.level - 1} 波 清除！`;
+  $("levelupMsg").textContent = boss5 ? "外星母艦壓境石門上空…全力迎戰！" : `石門防線穩固，迎接第 ${G.level} 波攻勢…`;
+  show("levelup");
+  setTimeout(() => {
+    if (G.state !== "levelup") return;
+    bullets = []; eBullets = [];
+    spawnWave(G.level);
+    G.state = "playing"; hideAll();
+    Sound.levelup();
+  }, 1600);
+}
+function loseLife() {
+  G.lives--;
+  G.combo = 0;
+  G.shake = 16;
+  Sound.hurt();
+  burst(player.x + player.w / 2, player.y + player.h / 2, "#ff4ec7", 26, 6);
+  if (G.lives <= 0) return gameOver();
+  player.invuln = 110;
+  player.x = W / 2 - player.w / 2; player.targetX = null;
+}
+function gameOver() {
+  G.state = "gameover";
+  if (G.score > G.high) { G.high = G.score; localStorage.setItem("alienInvasionHigh", G.high); }
+  $("finalScore").textContent = G.score.toLocaleString();
+  $("finalHigh").textContent  = G.high.toLocaleString();
+  $("finalLevel").textContent = G.level;
+  // 入榜判定
+  $("nameInput").value = "";
+  $("nameEntry").classList.toggle("hidden", !lbQualifies(G.score));
+  renderLB("goLeaderboard");
+  G.scoreSaved = false;
+  show("gameover");
+  Sound.over();
+}
+function setMute(m) { $("soundToggle").textContent = m ? "🔇" : "🔊"; }
+
+// ---------- 名人堂排行榜（localStorage） ----------
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+function loadLB() { try { return JSON.parse(localStorage.getItem("alienInvasionLB") || "[]"); } catch (e) { return []; } }
+function saveLB(lb) { localStorage.setItem("alienInvasionLB", JSON.stringify(lb.slice(0, 5))); }
+function lbQualifies(score) { const lb = loadLB(); return score > 0 && (lb.length < 5 || score > lb[lb.length - 1].score); }
+function renderLB(elId) {
+  const el = $(elId); if (!el) return;
+  const lb = loadLB();
+  if (!lb.length) { el.innerHTML = '<div class="lb-empty">尚無紀錄 — 當第一位英雄！</div>'; return; }
+  const rank = ["🥇", "🥈", "🥉", "4", "5"];
+  el.innerHTML = lb.map((r, i) =>
+    `<div class="lb-row"><span class="lb-rank">${rank[i]}</span>` +
+    `<span class="lb-name">${escapeHtml(r.name)}</span>` +
+    `<span class="lb-score">${(r.score || 0).toLocaleString()}</span></div>`
+  ).join("");
+}
+function submitScore() {
+  if (G.scoreSaved) return;
+  const name = (($("nameInput").value || "").trim() || "無名英雄").slice(0, 10);
+  const lb = loadLB();
+  lb.push({ name, score: G.score, level: G.level, diff: G.difficulty });
+  lb.sort((a, b) => b.score - a.score);
+  saveLB(lb);
+  G.scoreSaved = true;
+  $("nameEntry").classList.add("hidden");
+  renderLB("goLeaderboard"); renderLB("menuLeaderboard");
+}
+
+$("startBtn").onclick   = startGame;
+$("resumeBtn").onclick  = togglePause;
+$("quitBtn").onclick    = () => { G.state = "menu"; renderLB("menuLeaderboard"); show("menu"); };
+$("restartBtn").onclick = startGame;
+$("menuBtn").onclick    = () => { G.state = "menu"; renderLB("menuLeaderboard"); show("menu"); };
+
+// 難度選擇
+document.querySelectorAll(".diff-btn").forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll(".diff-btn").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    G.difficulty = b.dataset.diff;
+  };
+});
+// 音效開關
+$("soundToggle").onclick = () => { setMute(Sound.toggle()); };
+// 留名儲存
+$("saveName").onclick = submitScore;
+$("nameInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); submitScore(); }
+  e.stopPropagation();
+});
+
+// =========================================================================
+//  更新邏輯
+// =========================================================================
+function update() {
+  updateStars();
+  if (G.state !== "playing") return;
+
+  // ---- 計時器 ----
+  if (G.rapidTimer > 0) G.rapidTimer--;
+  if (G.shieldTimer > 0) G.shieldTimer--;
+  if (G.comboTimer > 0) { G.comboTimer--; if (G.comboTimer === 0) G.combo = 0; }
+  if (player.invuln > 0) player.invuln--;
+  if (G.shake > 0) G.shake *= 0.85;
+
+  // ---- 玩家移動 ----
+  let dx = 0;
+  if (keys["arrowleft"] || keys["a"]) dx -= 1;
+  if (keys["arrowright"] || keys["d"]) dx += 1;
+  if (dx !== 0) { player.x = clamp(player.x + dx * player.speed, 0, W - player.w); player.targetX = null; }
+  else if (player.targetX !== null) {
+    const diff = player.targetX - player.x;
+    if (Math.abs(diff) < 1) player.x = player.targetX;
+    else player.x += clamp(diff, -player.speed * 1.6, player.speed * 1.6);
+  }
+
+  // ---- 自動開火 ----
+  player.fireCd--;
+  if (player.fireCd <= 0) { playerShoot(); player.fireCd = G.rapidTimer > 0 ? 6 : 13; }
+
+  // ---- 玩家子彈 ----
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i]; b.x += b.vx; b.y += b.vy;
+    if (b.y < -20 || b.x < -20 || b.x > W + 20) { bullets.splice(i, 1); continue; }
+    let hit = false;
+    // 打小兵
+    for (let j = aliens.length - 1; j >= 0; j--) {
+      const a = aliens[j];
+      if (aabb(b, a)) {
+        a.hp -= b.dmg; a.flash = 6; hit = true;
+        Sound.hit();
+        if (a.hp <= 0) {
+          const def = ALIEN_TYPES[a.type];
+          addScore(def.points, a.x + a.w / 2, a.y);
+          burst(a.x + a.w / 2, a.y + a.h / 2, def.color, 16, 5);
+          Sound.explode();
+          maybeDropPower(a.x + a.w / 2, a.y, def.drop);
+          aliens.splice(j, 1);
+        }
+        break;
+      }
+    }
+    // 打 Boss
+    if (!hit && boss && !boss.entering && aabb(b, boss)) {
+      boss.hp -= b.dmg; boss.flash = 4; hit = true;
+      Sound.hit();
+      burst(b.x, b.y, "#ffd24a", 5, 3);
+      if (boss.hp <= 0) defeatBoss();
+    }
+    if (hit) bullets.splice(i, 1);
+  }
+
+  // ---- 外星艦隊移動 ----
+  if (aliens.length) updateFormation();
+
+  // ---- Boss ----
+  if (boss) updateBoss();
+
+  // ---- 敵方子彈 ----
+  for (let i = eBullets.length - 1; i >= 0; i--) {
+    const b = eBullets[i];
+    b.x += b.vx || 0; b.y += b.vy;
+    if (b.y > H + 20 || b.x < -20 || b.x > W + 20) { eBullets.splice(i, 1); continue; }
+    if (playerHittable() && aabb(b, player)) {
+      eBullets.splice(i, 1);
+      hitPlayer();
+    }
+  }
+
+  // ---- 道具 ----
+  for (let i = powerups.length - 1; i >= 0; i--) {
+    const p = powerups[i]; p.y += p.vy; p.t++;
+    if (p.y > H + 30) { powerups.splice(i, 1); continue; }
+    if (aabb(p, player)) { applyPower(p.type); powerups.splice(i, 1); }
+  }
+
+  updateParticles(); updateFloaters();
+
+  // ---- 過關判定 ----
+  if (!aliens.length && !boss) nextLevel();
+}
+
+function updateFormation() {
+  // 速度隨剩餘數量加快（經典手感）
+  const speed = G.formationSpeed * (1 + (1 - aliens.length / 30) * 1.4);
+  let minX = Infinity, maxX = -Infinity;
+  for (const a of aliens) {
+    a.x += G.formationDir * speed;
+    a.wob += 0.05;
+    minX = Math.min(minX, a.x); maxX = Math.max(maxX, a.x + a.w);
+    if (a.flash > 0) a.flash--;
+  }
+  // 觸邊 → 反向 + 下降
+  if (maxX > W - 12 || minX < 12) {
+    G.formationDir *= -1;
+    for (const a of aliens) { a.x = clamp(a.x, 12, W - 12 - a.w); a.y += 24; a.baseY += 24; }
+  }
+  // 隨機開火（取每欄最下方）
+  const bottoms = {};
+  for (const a of aliens) if (!bottoms[a.col] || a.y > bottoms[a.col].y) bottoms[a.col] = a;
+  for (const col in bottoms) {
+    const a = bottoms[col];
+    if (Math.random() < ALIEN_TYPES[a.type].fire * (1 + G.level * 0.1) * diff().fire && eBullets.length < 14) alienShoot(a);
+  }
+  // 撞到玩家底線 → 失誤 / 直接接觸
+  for (const a of aliens) {
+    if (a.y + a.h >= player.y + 6) {
+      if (playerHittable() && aabb(a, player)) { hitPlayer(); }
+      if (a.y + a.h >= H - 30) { loseLife(); resetFormationDown(); break; }
+    }
+  }
+}
+function resetFormationDown() {
+  for (const a of aliens) a.y -= 120;
+}
+
+function updateBoss() {
+  boss.t++;
+  if (boss.flash > 0) boss.flash--;
+  if (boss.entering) {
+    boss.y += 2.2;
+    if (boss.y >= 60) { boss.y = 60; boss.entering = false; }
+    return;
+  }
+  // 左右巡弋
+  boss.x += boss.dir * boss.speed;
+  if (boss.x < 10) { boss.x = 10; boss.dir = 1; }
+  if (boss.x > W - boss.w - 10) { boss.x = W - boss.w - 10; boss.dir = -1; }
+  boss.y = 60 + Math.sin(boss.t * 0.03) * 16;
+
+  // 攻擊型態
+  boss.fireCd--;
+  if (boss.fireCd <= 0) {
+    const cx = boss.x + boss.w / 2, by = boss.y + boss.h;
+    boss.pattern = (boss.pattern + 1) % 3;
+    if (boss.pattern === 0) {                       // 直線雙發
+      eBullets.push({ x: boss.x + 30, y: by, w: 8, h: 16, vy: 5, type: "boss" });
+      eBullets.push({ x: boss.x + boss.w - 38, y: by, w: 8, h: 16, vy: 5, type: "boss" });
+    } else if (boss.pattern === 1) {                // 扇形散射
+      for (let k = -2; k <= 2; k++)
+        eBullets.push({ x: cx - 4, y: by, w: 8, h: 14, vx: k * 1.6, vy: 4.4, type: "boss" });
+    } else {                                        // 瞄準玩家
+      const ang = Math.atan2(player.y - by, player.x + player.w / 2 - cx);
+      eBullets.push({ x: cx - 5, y: by, w: 10, h: 16, vx: Math.cos(ang) * 5, vy: Math.sin(ang) * 5 + 1, type: "boss" });
+    }
+    boss.fireCd = Math.max(22, Math.round((70 - G.level * 2) / diff().fire));
+  }
+  // 接觸玩家
+  if (playerHittable() && aabb(boss, player)) hitPlayer();
+}
+function defeatBoss() {
+  Sound.explode();
+  for (let i = 0; i < 6; i++)
+    setTimeout(() => burst(boss.x + rand(0, boss.w), boss.y + rand(0, boss.h), pick(["#ffd24a","#ff4ec7","#4af0ff"]), 22, 7), i * 90);
+  addScore(2000 + G.level * 200, boss.x + boss.w / 2, boss.y + 20);
+  G.shake = 20;
+  boss = null;
+}
+
+function playerHittable() { return player.invuln <= 0 && G.shieldTimer <= 0; }
+function hitPlayer() {
+  if (G.shieldTimer > 0) {           // 護盾擋下
+    burst(player.x + player.w / 2, player.y, "#6dff8c", 12, 4);
+    Sound.hit(); return;
+  }
+  if (player.invuln > 0) return;
+  loseLife();
+}
+function addScore(base, x, y) {
+  G.combo++;
+  G.comboTimer = 120;
+  const mult = 1 + Math.floor(G.combo / 5) * 0.5;       // 連擊加成
+  const gained = Math.round(base * mult);
+  G.score += gained;
+  floatText(x, y, "+" + gained, mult > 1 ? "#ffd24a" : "#eaf6ff");
+}
+
+// =========================================================================
+//  繪製
+// =========================================================================
+function drawAlien(a) {
+  const def = ALIEN_TYPES[a.type];
+  const yy = a.y + Math.sin(a.wob) * 2;
+  const color = a.flash > 0 ? "#ffffff" : def.color;
+  drawSprite(SPRITES[a.type], a.x, yy, def.cell, color, true);
+  // 受損色條（bomber/fighter）
+  if (a.maxHp > 1 && a.hp < a.maxHp) {
+    ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(a.x, yy - 5, a.w, 3);
+    ctx.fillStyle = def.color; ctx.fillRect(a.x, yy - 5, a.w * (a.hp / a.maxHp), 3);
+  }
+}
+function drawBoss() {
+  const b = boss, cx = b.x + b.w / 2;
+  ctx.save();
+  ctx.shadowColor = "#ff4ec7"; ctx.shadowBlur = 18;
+  // 主體
+  ctx.fillStyle = b.flash > 0 ? "#ffffff" : "#b03bff";
+  ctx.beginPath();
+  ctx.moveTo(cx, b.y);
+  ctx.lineTo(b.x + b.w, b.y + b.h * 0.55);
+  ctx.lineTo(b.x + b.w - 26, b.y + b.h);
+  ctx.lineTo(b.x + 26, b.y + b.h);
+  ctx.lineTo(b.x, b.y + b.h * 0.55);
+  ctx.closePath(); ctx.fill();
+  // 核心
+  ctx.shadowColor = "#4af0ff"; ctx.shadowBlur = 22;
+  ctx.fillStyle = "#4af0ff";
+  ctx.beginPath(); ctx.arc(cx, b.y + b.h * 0.5, 16 + Math.sin(b.t * 0.15) * 3, 0, Math.PI * 2); ctx.fill();
+  // 眼睛
+  ctx.shadowBlur = 0; ctx.fillStyle = "#ff2a6d";
+  ctx.fillRect(cx - 42, b.y + 28, 18, 8);
+  ctx.fillRect(cx + 24, b.y + 28, 18, 8);
+  ctx.restore();
+  // HP 條（縮窄留出右上角給音效鈕）
+  const bw = W - 110, bx = 50, byy = 16;
+  ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(bx, byy, bw, 10);
+  ctx.fillStyle = "#ff2a6d"; ctx.fillRect(bx, byy, bw * clamp(b.hp / b.maxHp, 0, 1), 10);
+  ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 1; ctx.strokeRect(bx, byy, bw, 10);
+  ctx.fillStyle = "#fff"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("✦ 巨型母艦 BOSS ✦", bx + bw / 2, byy + 9);
+  ctx.textAlign = "left";
+}
+function drawBullet(b, color) {
+  ctx.save(); ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.fillStyle = color;
+  ctx.fillRect(b.x, b.y, b.w, b.h); ctx.restore();
+}
+
+function drawHUD() {
+  ctx.save();
+  ctx.textAlign = "left"; ctx.textBaseline = "top";
+  // 分數
+  ctx.fillStyle = "#eaf6ff"; ctx.font = "bold 22px 'Trebuchet MS', sans-serif";
+  ctx.fillText(G.score.toLocaleString(), 16, boss ? 32 : 14);
+  ctx.fillStyle = "#7f93bf"; ctx.font = "11px sans-serif";
+  ctx.fillText("最高 " + G.high.toLocaleString(), 16, boss ? 58 : 40);
+
+  // 波數 + 難度（置中）
+  if (!boss) {
+    ctx.textAlign = "center"; ctx.fillStyle = "#4af0ff"; ctx.font = "bold 13px sans-serif";
+    ctx.fillText("第 " + G.level + " 波", W / 2, 14);
+    const d = diff(); ctx.fillStyle = d.color; ctx.font = "11px sans-serif";
+    ctx.fillText(d.name, W / 2, 32);
+  }
+
+  // 生命（左上，戰機圖示；避開右上角音效鈕）
+  const lifeY = boss ? 78 : 60;
+  for (let i = 0; i < G.lives; i++) {
+    const lx = 22 + i * 19, ly = lifeY;
+    ctx.fillStyle = "#ff4ec7"; ctx.shadowColor = "#ff4ec7"; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx - 6, ly + 12); ctx.lineTo(lx + 6, ly + 12); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // 強化狀態列（底部）
+  let bx = 16; const by = H - 26;
+  const badge = (label, color, on, ratio) => {
+    ctx.globalAlpha = on ? 1 : 0.28;
+    ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(bx, by, 64, 18);
+    ctx.fillStyle = color; ctx.fillRect(bx, by, 64 * (ratio ?? 1), 2);
+    ctx.fillStyle = on ? color : "#56617e";
+    ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText(label, bx + 6, by + 10);
+    ctx.globalAlpha = 1; bx += 72;
+  };
+  badge("火力 " + G.weapon, "#ffd24a", G.weapon > 1);
+  badge("急速", "#4af0ff", G.rapidTimer > 0, G.rapidTimer / (60 * 8));
+  badge("護盾", "#6dff8c", G.shieldTimer > 0, G.shieldTimer / (60 * 7));
+  if (G.combo >= 5) {
+    ctx.fillStyle = "#ffd24a"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText("連擊 x" + (1 + Math.floor(G.combo / 5) * 0.5).toFixed(1), W - 16, by + 9);
+  }
+  ctx.restore();
+}
+
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.save();
+  if (G.shake > 0.5) ctx.translate(rand(-G.shake, G.shake), rand(-G.shake, G.shake));
+
+  drawStars();
+
+  if (G.state !== "menu") {
+    powerups.forEach(drawPowerup);
+    aliens.forEach(drawAlien);
+    if (boss) drawBoss();
+    bullets.forEach(b => drawBullet(b, "#fff7a8"));
+    eBullets.forEach(b => drawBullet(b, b.type === "boss" ? "#ff2a6d" : "#ff7ad9"));
+    drawParticles();
+    if (player) drawShip(player);
+    drawFloaters();
+  } else {
+    drawParticles();
+  }
+  ctx.restore();
+
+  if (G.state === "playing" || G.state === "paused" || G.state === "levelup") drawHUD();
+}
+
+// =========================================================================
+//  主迴圈（固定步長）
+// =========================================================================
+let acc = 0, last = performance.now();
+const STEP = 1000 / 60;
+function loop(now) {
+  acc += now - last; last = now;
+  let guard = 0;
+  while (acc >= STEP && guard < 5) { update(); acc -= STEP; guard++; }
+  if (acc > 200) acc = 0;
+  render();
+  requestAnimationFrame(loop);
+}
+
+// =========================================================================
+//  石門國小校徽（Canvas 重繪 → data URL，無外部圖檔相依）
+// =========================================================================
+function makeBadgeDataURL(size) {
+  size = size || 320;
+  const c = document.createElement("canvas"); c.width = c.height = size;
+  const x = c.getContext("2d");
+  const cx = size / 2, cy = size / 2, R = size / 2 - 2;
+
+  // 外環（淺藍）→ 白環 → 靛藍底
+  x.fillStyle = "#8FCDEA"; x.beginPath(); x.arc(cx, cy, R, 0, Math.PI * 2); x.fill();
+  x.fillStyle = "#ffffff"; x.beginPath(); x.arc(cx, cy, R * 0.905, 0, Math.PI * 2); x.fill();
+  x.fillStyle = "#2B2A86"; x.beginPath(); x.arc(cx, cy, R * 0.86, 0, Math.PI * 2); x.fill();
+
+  // 弧形英文校名
+  const txt = "Shih Men Elementary School";
+  x.fillStyle = "#ffffff";
+  x.font = "700 " + (size * 0.06) + 'px "Trebuchet MS", Arial, sans-serif';
+  x.textAlign = "center"; x.textBaseline = "middle";
+  const arcR = R * 0.745, span = Math.PI * 1.16, start = -span / 2;
+  for (let i = 0; i < txt.length; i++) {
+    const a = start + span * (i / (txt.length - 1));
+    x.save(); x.translate(cx, cy); x.rotate(a); x.translate(0, -arcR);
+    x.fillText(txt[i], 0, 0); x.restore();
+  }
+
+  // 中央水庫大壩（淺藍梯形 + 中縫＝門）
+  const T = cy - R * 0.40, B = cy + R * 0.52;
+  x.fillStyle = "#27ABE6";
+  x.beginPath();
+  x.moveTo(cx - R * 0.055, T); x.lineTo(cx + R * 0.055, T);
+  x.lineTo(cx + R * 0.30, B);  x.lineTo(cx - R * 0.30, B);
+  x.closePath(); x.fill();
+  x.fillStyle = "#2B2A86"; x.fillRect(cx - R * 0.016, T, R * 0.032, B - T);
+
+  // 橘色幼苗（鱻魚特色學園的成長意象）
+  x.fillStyle = "#F2901C";
+  x.fillRect(cx - R * 0.022, cy + R * 0.36, R * 0.044, R * 0.18);
+  const leaf = dir => { x.save(); x.translate(cx + dir * R * 0.07, cy + R * 0.37); x.rotate(dir * 0.7);
+    x.beginPath(); x.ellipse(0, 0, R * 0.11, R * 0.052, 0, 0, Math.PI * 2); x.fill(); x.restore(); };
+  leaf(-1); leaf(1);
+
+  // 紅色「石」「門」（白邊）
+  x.font = "900 " + (size * 0.2) + 'px "Microsoft JhengHei","Noto Sans TC",sans-serif';
+  x.textAlign = "center"; x.textBaseline = "middle";
+  x.lineWidth = size * 0.012; x.lineJoin = "round"; x.strokeStyle = "#ffffff";
+  const dc = (ch, px) => { x.strokeText(ch, px, cy + R * 0.03); x.fillStyle = "#E32119"; x.fillText(ch, px, cy + R * 0.03); };
+  dc("石", cx - R * 0.6); dc("門", cx + R * 0.6);
+
+  return c.toDataURL();
+}
+
+// 選單時讓星空飄動
+initStars();
+makePlayer();
+$("schoolBadge").src = makeBadgeDataURL();
+renderLB("menuLeaderboard");
+show("menu");
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
