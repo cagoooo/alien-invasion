@@ -49,7 +49,7 @@
     box-shadow: 0 0 0 2px rgba(74,240,255,0.35),
                 0 0 40px rgba(74,240,255,0.25),
                 inset 0 0 60px rgba(13,9,48,0.8);
-    background: #05030f;
+    background: var(--bg-0);
   }
   canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
@@ -112,11 +112,12 @@
   /* ---------- 模式 / 難度選擇 ---------- */
   .diff-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; }
   .diff-label { font-size: 12px; color: #8fa2c8; margin-right: 1px; }
-  .diff-btn, .mode-btn {
+  .diff-btn, .mode-btn, .theme-btn {
     cursor: pointer; font-family: inherit; font-weight: 700; font-size: 13px;
     color: #b9c8e6; padding: 6px 13px; border-radius: 999px;
     background: rgba(26,22,64,0.6); border: 1px solid #3a3470; transition: all .15s ease;
   }
+  .theme-btn.active { color: #05030f; background: var(--neon); border-color: var(--neon); box-shadow: 0 0 12px var(--neon); }
   .diff-btn.active { color: #05030f; background: var(--neon); border-color: var(--neon); box-shadow: 0 0 14px rgba(74,240,255,0.5); }
   .diff-btn[data-diff="easy"].active { background: var(--neon-green); border-color: var(--neon-green); box-shadow: 0 0 14px rgba(109,255,140,0.5); }
   .diff-btn[data-diff="hard"].active { background: var(--neon-pink); border-color: var(--neon-pink); box-shadow: 0 0 14px rgba(255,78,199,0.5); }
@@ -268,6 +269,15 @@
         <label class="set-item"><span>🌀 減少動態<br><small>關閉螢幕震動、減少粒子（暈動症友善）</small></span><input type="checkbox" id="setRM"></label>
         <label class="set-item"><span>👁️ 色盲友善<br><small>敵方子彈加白色描邊，更好辨識</small></span><input type="checkbox" id="setCB"></label>
         <div class="set-item" style="flex-direction:column;align-items:stretch;gap:8px">
+          <span>🎨 主題皮膚</span>
+          <div class="ct-btns">
+            <button class="theme-btn" data-theme="classic">經典</button>
+            <button class="theme-btn" data-theme="retro">復古綠</button>
+            <button class="theme-btn" data-theme="shimen">石門藍</button>
+            <button class="theme-btn" data-theme="night">暗夜紫</button>
+          </div>
+        </div>
+        <div class="set-item" style="flex-direction:column;align-items:stretch;gap:8px">
           <span>⏲️ 下課計時器<br><small id="ctState">老師用：時間到提醒孩子收心</small></span>
           <div class="ct-btns">
             <button class="diff-btn" data-min="0">關閉</button>
@@ -393,6 +403,23 @@ const SETTINGS = {
     !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches),
   colorblind: localStorage.getItem("alienColorblind") === "1",
 };
+
+// ---------- 主題皮膚 ----------
+const THEMES = {
+  classic: { name: "經典霓虹", neon: "#4af0ff", pink: "#ff4ec7", green: "#6dff8c", bg0: "#05030f", bg1: "#0d0930", ship: "#e9f7ff", pbullet: "#fff7a8" },
+  retro:   { name: "復古綠",   neon: "#6dff8c", pink: "#b6ff5a", green: "#9dff6d", bg0: "#02110a", bg1: "#063018", ship: "#d6ffe0", pbullet: "#c6ff8a" },
+  shimen:  { name: "石門藍",   neon: "#27abe6", pink: "#e32119", green: "#f2901c", bg0: "#050a1f", bg1: "#0d1a4a", ship: "#dff2ff", pbullet: "#ffd24a" },
+  night:   { name: "暗夜紫",   neon: "#b06bff", pink: "#ff5ad0", green: "#7df9ff", bg0: "#0a0518", bg1: "#1a0d3a", ship: "#f0e6ff", pbullet: "#ff9bf0" },
+};
+let TH = THEMES[localStorage.getItem("alienTheme")] || THEMES.classic;
+function applyTheme(key) {
+  const k = THEMES[key] ? key : "classic";
+  TH = THEMES[k]; localStorage.setItem("alienTheme", k);
+  const r = document.documentElement.style;
+  r.setProperty("--neon", TH.neon); r.setProperty("--neon-pink", TH.pink); r.setProperty("--neon-green", TH.green);
+  r.setProperty("--bg-0", TH.bg0); r.setProperty("--bg-1", TH.bg1);
+  document.querySelectorAll(".theme-btn").forEach(b => b.classList.toggle("active", b.dataset.theme === k));
+}
 
 // =========================================================================
 //  音效（Web Audio 合成，零外部檔案）
@@ -674,8 +701,8 @@ function drawShip(p) {
   ctx.moveTo(cx - 7, y + h - 4); ctx.lineTo(cx, y + h + flame); ctx.lineTo(cx + 7, y + h - 4);
   ctx.fill();
   // 機身
-  ctx.shadowColor = "#4af0ff"; ctx.shadowBlur = 10;
-  ctx.fillStyle = "#e9f7ff";
+  ctx.shadowColor = TH.neon; ctx.shadowBlur = 10;
+  ctx.fillStyle = TH.ship;
   ctx.beginPath();
   ctx.moveTo(cx, y);
   ctx.lineTo(x + w, y + h);
@@ -1260,10 +1287,10 @@ document.querySelectorAll(".lb-tpill").forEach(b => {
 // 雲端就緒後刷新目前面板
 addEventListener("cloud-ready", () => refreshLB(visibleLBId()));
 
-// 難度選擇
-document.querySelectorAll(".diff-btn").forEach(b => {
+// 難度選擇（限 .diff-group 內，避免誤抓下課計時器的按鈕）
+document.querySelectorAll(".diff-group .diff-btn").forEach(b => {
   b.onclick = () => {
-    document.querySelectorAll(".diff-btn").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll(".diff-group .diff-btn").forEach(x => x.classList.remove("active"));
     b.classList.add("active");
     G.difficulty = b.dataset.diff;
   };
@@ -1283,6 +1310,8 @@ $("setBtn").onclick  = () => {
 $("setBack").onclick = () => show("menu");
 $("setRM").onchange = e => { SETTINGS.reducedMotion = e.target.checked; localStorage.setItem("alienReducedMotion", e.target.checked ? "1" : "0"); };
 $("setCB").onchange = e => { SETTINGS.colorblind = e.target.checked; localStorage.setItem("alienColorblind", e.target.checked ? "1" : "0"); };
+// 主題皮膚
+document.querySelectorAll(".theme-btn").forEach(b => { b.onclick = () => applyTheme(b.dataset.theme); });
 
 // PWA 安裝提示
 let deferredPrompt = null;
@@ -1361,10 +1390,18 @@ function update() {
   if (player.invuln > 0) player.invuln--;
   if (G.shake > 0) G.shake *= 0.85;
 
-  // ---- 玩家移動 ----
+  // ---- 玩家移動（鍵盤 / 手把 / 觸控）----
   let dx = 0;
   if (keys["arrowleft"] || keys["a"]) dx -= 1;
   if (keys["arrowright"] || keys["d"]) dx += 1;
+  // 手把：左類比 X 軸 + 十字鍵
+  const pad = navigator.getGamepads && navigator.getGamepads()[0];
+  if (pad) {
+    const ax = pad.axes[0] || 0;
+    if (Math.abs(ax) > 0.22) { player.x = clamp(player.x + ax * player.speed, 0, W - player.w); player.targetX = null; dx = 0; }
+    else if (pad.buttons[14] && pad.buttons[14].pressed) dx = -1;
+    else if (pad.buttons[15] && pad.buttons[15].pressed) dx = 1;
+  }
   if (dx !== 0) { player.x = clamp(player.x + dx * player.speed, 0, W - player.w); player.targetX = null; }
   else if (player.targetX !== null) {
     // 指標 / 觸控：快速跟手（不再受鍵盤移動速度上限拖累，滑到哪飛到哪）
@@ -1720,7 +1757,7 @@ function render() {
     powerups.forEach(drawPowerup);
     aliens.forEach(drawAlien);
     if (boss) drawBoss();
-    bullets.forEach(b => drawBullet(b, b.kind === "laser" ? "#7df9ff" : b.kind === "missile" ? "#ff9b3c" : "#fff7a8"));
+    bullets.forEach(b => drawBullet(b, b.kind === "laser" ? "#7df9ff" : b.kind === "missile" ? "#ff9b3c" : TH.pbullet));
     eBullets.forEach(b => {
       if (SETTINGS.colorblind) { ctx.fillStyle = "#fff"; ctx.fillRect(b.x - 1.5, b.y - 1.5, b.w + 3, b.h + 3); }   // 色盲：敵彈白描邊
       drawBullet(b, b.type === "boss" ? "#ff2a6d" : "#ff7ad9");
@@ -1817,6 +1854,7 @@ makePlayer();
 $("schoolBadge").src = makeBadgeDataURL();
 refreshLB("menuLeaderboard");
 updateAchCounts();
+applyTheme(localStorage.getItem("alienTheme") || "classic");
 document.querySelector('.ct-btns .diff-btn[data-min="0"]').classList.add("active");
 tickClassTimer();   // 若上次設的計時器還沒到，繼續顯示
 show("menu");
