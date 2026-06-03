@@ -718,16 +718,20 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden && G.state === "playing") togglePause();
 });
 
-// 指標（滑鼠 + 觸控）
+// 指標控制（滑鼠拖曳 + 手機/平板滑動）— 飛機 X 直接跟著手指/游標走
 function pointerMove(clientX) {
   if (G.state !== "playing" || !player) return;
   const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0) return;
   const lx = (clientX - rect.left) / rect.width * W;
   player.targetX = clamp(lx - player.w / 2, 0, W - player.w);
 }
+// 滑鼠 / 觸控筆（pointer events）
 canvas.addEventListener("pointerdown", e => { Sound.resume(); pointerMove(e.clientX); });
 canvas.addEventListener("pointermove", e => { if (e.pressure > 0 || e.buttons || e.pointerType === "touch") pointerMove(e.clientX); });
-canvas.addEventListener("touchmove", e => { e.preventDefault(); pointerMove(e.touches[0].clientX); }, { passive: false });
+// 手機 / 平板觸控：碰下去就定位、滑動即操控；preventDefault 防止頁面捲動與雙指縮放
+canvas.addEventListener("touchstart", e => { Sound.resume(); if (e.touches[0]) pointerMove(e.touches[0].clientX); e.preventDefault(); }, { passive: false });
+canvas.addEventListener("touchmove",  e => { if (e.touches[0]) pointerMove(e.touches[0].clientX); e.preventDefault(); }, { passive: false });
 
 // =========================================================================
 //  生命週期：開始 / 暫停 / 結束
@@ -938,9 +942,9 @@ function update() {
   if (keys["arrowright"] || keys["d"]) dx += 1;
   if (dx !== 0) { player.x = clamp(player.x + dx * player.speed, 0, W - player.w); player.targetX = null; }
   else if (player.targetX !== null) {
-    const diff = player.targetX - player.x;
-    if (Math.abs(diff) < 1) player.x = player.targetX;
-    else player.x += clamp(diff, -player.speed * 1.6, player.speed * 1.6);
+    // 指標 / 觸控：快速跟手（不再受鍵盤移動速度上限拖累，滑到哪飛到哪）
+    const d = player.targetX - player.x;
+    player.x += Math.abs(d) < 1.5 ? d : d * 0.5;
   }
 
   // ---- 自動開火 ----
