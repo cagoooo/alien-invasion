@@ -2,7 +2,7 @@
    策略：HTML 導覽用 network-first（線上永遠最新、離線退回快取）；
         靜態資源（圖示／manifest）用 cache-first。
    更新版本時把 VERSION bump 一碼即可讓全校裝置抓新版。 */
-const VERSION = "v1.6.0";
+const VERSION = "v1.6.1";
 const CACHE = "alien-invasion-" + VERSION;
 const ASSETS = [
   "./", "./index.html", "./manifest.webmanifest",
@@ -10,6 +10,7 @@ const ASSETS = [
   "./assets/audio/bgm.mp3", "./assets/audio/shoot.mp3", "./assets/audio/explode.mp3",
   "./assets/audio/powerup.mp3", "./assets/audio/hurt.mp3", "./assets/audio/levelup.mp3",
   "./assets/audio/boss.mp3", "./assets/audio/over.mp3",
+  "./assets/audio/click.mp3", "./assets/audio/combo.mp3",
 ];
 
 self.addEventListener("install", e => {

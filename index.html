@@ -492,7 +492,8 @@ function applyTheme(key) {
 //  音效（Web Audio 合成，零外部檔案）
 // =========================================================================
 // 音效 / BGM 素材：Pixabay Content License（CC0 等價，商用免費、免標示）
-//   BGM「8-Bit space」by purrsahfef · 雷射 by ribhavagrawal · 爆炸/道具/升級/警報/結束 by freesound_community 等
+//   BGM「8-Bit space」by purrsahfef · 雷射 by ribhavagrawal · 爆炸/道具/升級/警報/結束 by freesound_community
+//   UI 點擊 by soundshelfstudio · 連擊（coin）by chieuk
 const Sound = (() => {
   let ctxA = null, muted = false;
   function ac() {
@@ -529,8 +530,8 @@ const Sound = (() => {
   }
   // ---- 真實 mp3 音效（Pixabay CC0）+ BGM ----
   const AUDIO_BASE = "assets/audio/";
-  const SFX_FILES = { shoot: "shoot", explode: "explode", powerup: "powerup", hurt: "hurt", levelup: "levelup", boss: "boss", over: "over" };
-  const SFX_VOL = { shoot: 0.3, explode: 0.5, powerup: 0.55, hurt: 0.5, levelup: 0.55, boss: 0.6, over: 0.6 };
+  const SFX_FILES = { shoot: "shoot", explode: "explode", powerup: "powerup", hurt: "hurt", levelup: "levelup", boss: "boss", over: "over", click: "click", combo: "combo" };
+  const SFX_VOL = { shoot: 0.3, explode: 0.5, powerup: 0.55, hurt: 0.5, levelup: 0.55, boss: 0.6, over: 0.6, click: 0.4, combo: 0.5 };
   const POOL = 4;
   const sfxPool = {};
   let audioReady = false;
@@ -590,6 +591,8 @@ const Sound = (() => {
     levelup() { playSfx("levelup"); },
     boss()    { playSfx("boss"); },
     over()    { playSfx("over"); },
+    click()   { playSfx("click"); },
+    combo()   { playSfx("combo"); },
   };
 })();
 
@@ -1150,6 +1153,11 @@ addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && G.state === "playing") togglePause();
 });
+
+// 全站 UI 點擊聲（任何 button；capture 確保在按鈕自身 handler 前響）
+document.addEventListener("click", e => {
+  if (e.target.closest("button")) { Sound.resume(); Sound.click(); }
+}, true);
 
 // 指標控制（滑鼠拖曳 + 手機/平板滑動）— 飛機 X 直接跟著手指/游標走
 function pointerMove(clientX) {
@@ -1967,6 +1975,7 @@ function hitPlayer() {
 function addScore(base, x, y) {
   G.combo++;
   G.comboTimer = 120;
+  if (G.combo > 0 && G.combo % 5 === 0) Sound.combo();   // 每 5 連擊：倍率提升 → 連擊音
   const mult = 1 + Math.floor(G.combo / 5) * 0.5;       // 連擊加成
   const gained = Math.round(base * mult);
   G.score += gained;
