@@ -30,6 +30,7 @@
 | **P17 第三波·劇情關** | 📖 保衛石門 6 關劇情戰役 + 旁白卡 + 通關勝利畫面 | ✅ |
 | **P18 第三波·老師後台** | 📊 雲端資料聚合儀表板：場次/平均/最高分 + 年級難度分布 + 班級 TOP（含 數據儀表板） | ✅ |
 | **P19 第三波·關卡編輯器** | 🛠️ 7×5 格子自製關卡 + 試玩 + 分享/載入代碼（SM-…）→ **第三波大型 roadmap 100% 完成** 🎉 | ✅ |
+| **P20 真實音效 + BGM** | 🎵 Pixabay CC0：8 個 mp3（雷射/爆炸/道具/受傷/升級/Boss/結束 + 8-bit space BGM）取代程序合成，HTML5 Audio pool + BGM 淡入淡出，納入 SW 快取（離線仍有聲） | ✅ |
 
 ---
 
@@ -52,7 +53,7 @@
 | 層 | 技術 |
 |---|---|
 | 遊戲核心 | 純 HTML5 Canvas 2D + 原生 JS（單檔 `index.html`，零相依、零建置） |
-| 音效 | Web Audio API 即時合成 |
+| 音效 / BGM | Pixabay CC0 真實 mp3（HTML5 Audio pool + BGM loop）；hit tick 保留 Web Audio 合成 |
 | 排行榜 | Firebase 匿名登入 + Firestore（`penguin-leaderboard` / 集合 `alienInvasion`） |
 | PWA | `manifest.webmanifest` + `sw.js` |
 | 校徽/圖示 | Canvas 向量重繪（無外部圖檔） |
