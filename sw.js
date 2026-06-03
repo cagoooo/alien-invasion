@@ -2,7 +2,7 @@
    策略：HTML 導覽用 network-first（線上永遠最新、離線退回快取）；
         靜態資源（圖示／manifest）用 cache-first。
    更新版本時把 VERSION bump 一碼即可讓全校裝置抓新版。 */
-const VERSION = "v1.6.2";
+const VERSION = "v1.7.0";
 const CACHE = "alien-invasion-" + VERSION;
 const ASSETS = [
   "./", "./index.html", "./manifest.webmanifest",
@@ -15,7 +15,8 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // 不自動 skipWaiting：新版先進入 waiting，由頁面顯示「立即更新」橫幅後才接管
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
 });
 
 self.addEventListener("activate", e => {
@@ -24,6 +25,11 @@ self.addEventListener("activate", e => {
       .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
+});
+
+// 頁面按「立即更新」→ postMessage SKIP_WAITING → 新版接管（觸發 controllerchange）
+self.addEventListener("message", e => {
+  if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("fetch", e => {
