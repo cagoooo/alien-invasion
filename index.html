@@ -493,7 +493,8 @@ function applyTheme(key) {
 // =========================================================================
 // 音效 / BGM 素材：Pixabay Content License（CC0 等價，商用免費、免標示）
 //   BGM「8-Bit space」by purrsahfef · 雷射 by ribhavagrawal · 爆炸/道具/升級/警報/結束 by freesound_community
-//   UI 點擊 by soundshelfstudio · 連擊（coin）by chieuk
+//   UI 點擊 by soundshelfstudio · 連擊（coin）by chieuk · 過場 whoosh by dragon-studio
+//   護盾 by freesound_community · 勝利 by eaglaxle
 const Sound = (() => {
   let ctxA = null, muted = false;
   function ac() {
@@ -530,8 +531,8 @@ const Sound = (() => {
   }
   // ---- 真實 mp3 音效（Pixabay CC0）+ BGM ----
   const AUDIO_BASE = "assets/audio/";
-  const SFX_FILES = { shoot: "shoot", explode: "explode", powerup: "powerup", hurt: "hurt", levelup: "levelup", boss: "boss", over: "over", click: "click", combo: "combo" };
-  const SFX_VOL = { shoot: 0.3, explode: 0.5, powerup: 0.55, hurt: 0.5, levelup: 0.55, boss: 0.6, over: 0.6, click: 0.4, combo: 0.5 };
+  const SFX_FILES = { shoot: "shoot", explode: "explode", powerup: "powerup", hurt: "hurt", levelup: "levelup", boss: "boss", over: "over", click: "click", combo: "combo", whoosh: "whoosh", shield: "shield", victory: "victory" };
+  const SFX_VOL = { shoot: 0.3, explode: 0.5, powerup: 0.55, hurt: 0.5, levelup: 0.55, boss: 0.6, over: 0.6, click: 0.4, combo: 0.5, whoosh: 0.45, shield: 0.5, victory: 0.6 };
   const POOL = 4;
   const sfxPool = {};
   let audioReady = false;
@@ -593,6 +594,9 @@ const Sound = (() => {
     over()    { playSfx("over"); },
     click()   { playSfx("click"); },
     combo()   { playSfx("combo"); },
+    whoosh()  { playSfx("whoosh"); },
+    shield()  { playSfx("shield"); },
+    victory() { playSfx("victory"); },
   };
 })();
 
@@ -978,7 +982,7 @@ function maybeDropPower(x, y, chance) {
   powerups.push({ x: x - 13, y, w: 26, h: 26, vy: 1.8, type, t: 0 });
 }
 function applyPower(type) {
-  Sound.powerup();
+  if (type === "shield") Sound.shield(); else Sound.powerup();   // 護盾專屬音
   const d = POWER_DEFS[type];
   floatText(player.x + player.w / 2, player.y - 10, d.name, d.color);
   if (type === "spread") { G.weapon = Math.min(3, G.weapon + 1); if (G.weapon === 3) unlockAch("maxpower"); }
@@ -1206,6 +1210,7 @@ function togglePause() {
   else if (G.state === "paused") { G.state = "playing"; Sound.startBGM(); hideAll(); }
 }
 function nextLevel() {
+  Sound.whoosh();                       // 過場音
   if (G.flawless) unlockAch("flawless");
   G.flawless = true;                    // 下一波重新計零失誤
   G.level++;
@@ -1237,6 +1242,7 @@ function startStory() { G.storyStage = -1; storyAdvance(); }
 function storyAdvance() {
   G.storyStage++;
   if (G.storyStage >= STORY.length) return storyVictory();
+  Sound.whoosh();                       // 過場音
   const s = STORY[G.storyStage];
   G.state = "levelup";
   $("levelupTitle").textContent = s.t;
@@ -1271,7 +1277,7 @@ function loseLife() {
 function gameOver() {
   G.state = "gameover";
   Sound.stopBGM();
-  if (G.won) Sound.levelup(); else Sound.over();
+  if (G.won) Sound.victory(); else Sound.over();
   $("goTitle").textContent = G.won ? (G.mode === "custom" ? "🎉 自製關卡破關！" : "🎉 石門守住了！") : "遊戲結束";
   if (G.score > G.high) { G.high = G.score; localStorage.setItem("alienInvasionHigh", G.high); }
   $("finalScore").textContent = G.score.toLocaleString();
@@ -1967,7 +1973,7 @@ function playerHittable() { return player.invuln <= 0 && G.shieldTimer <= 0; }
 function hitPlayer() {
   if (G.shieldTimer > 0) {           // 護盾擋下
     burst(player.x + player.w / 2, player.y, "#6dff8c", 12, 4);
-    Sound.hit(); return;
+    Sound.shield(); return;
   }
   if (player.invuln > 0) return;
   loseLife();
