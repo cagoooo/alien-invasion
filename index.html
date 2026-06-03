@@ -162,6 +162,27 @@
   }
   .sound-toggle:active { transform: scale(0.92); }
 
+  /* ---------- 成就徽章 ---------- */
+  .ach-link { cursor: pointer; color: #ffd24a; border-bottom: 1px dotted currentColor; }
+  .ach-link:active { opacity: .7; }
+  .ach-toast {
+    position: absolute; top: 54px; right: 10px; z-index: 7; max-width: 70%;
+    display: flex; align-items: center; gap: 9px; padding: 9px 14px; border-radius: 12px;
+    background: rgba(13,9,48,0.92); border: 1px solid #ffd24a; color: #fff;
+    font-size: 13px; line-height: 1.25; text-align: left;
+    transform: translateX(120%); opacity: 0; transition: transform .35s cubic-bezier(.2,1.3,.5,1), opacity .35s;
+    box-shadow: 0 0 18px rgba(255,210,74,0.4);
+  }
+  .ach-toast.show { transform: translateX(0); opacity: 1; }
+  .ach-toast .ach-emoji { font-size: 24px; }
+  .ach-list { width: min(340px, 88%); max-height: 60%; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .ach-item { display: flex; align-items: center; gap: 10px; text-align: left;
+    background: rgba(13,9,48,0.6); border: 1px solid #2a2658; border-radius: 10px; padding: 8px 12px; opacity: .55; }
+  .ach-item.got { opacity: 1; border-color: #ffd24a; background: rgba(255,210,74,0.08); }
+  .ach-i-emoji { font-size: 22px; width: 26px; text-align: center; }
+  .ach-i-text { font-size: 13px; color: #eaf6ff; }
+  .ach-i-text small { color: #8fa2c8; font-size: 11px; }
+
   /* ---------- 頁尾署名 ---------- */
   .site-credit {
     text-align: center; font-size: 12px;
@@ -184,6 +205,7 @@
   <div id="stage">
     <canvas id="game" width="600" height="800"></canvas>
     <button class="sound-toggle" id="soundToggle" title="音效開關 (M)">🔊</button>
+    <div class="ach-toast" id="achToast"></div>
 
     <!-- 開始選單 -->
     <div class="screen" id="menu">
@@ -211,7 +233,14 @@
         </div>
         <div id="menuLeaderboard"></div>
       </div>
-      <p class="credit-small">桃園市龍潭區石門國民小學 · 鱻魚特色學園</p>
+      <p class="credit-small"><span class="ach-link" id="achBtn">🏅 成就 <b id="achMenuCount">0/10</b></span> · 桃園市龍潭區石門國民小學</p>
+    </div>
+
+    <!-- 成就徽章 -->
+    <div class="screen hidden" id="achScreen">
+      <h1 class="title" style="font-size:clamp(24px,6vw,40px)">🏅 成就徽章<span class="en" id="achCount">0 / 10</span></h1>
+      <div class="ach-list" id="achList"></div>
+      <button class="btn secondary" id="achBack">返回 ◂</button>
     </div>
 
     <!-- 暫停 -->
@@ -412,6 +441,26 @@ const SPRITES = {
     "001100110011",
     "110000000011",
   ],
+  splitter: [ // 分裂體（死亡時分裂成 2 隻偵察兵）
+    "01100110",
+    "11111111",
+    "11011011",
+    "11111111",
+    "01111110",
+    "00111100",
+    "01000010",
+    "10000001",
+  ],
+  diver: [   // 俯衝兵（無盡模式：朝玩家追擊）
+    "0001000",
+    "0011100",
+    "0111110",
+    "1111111",
+    "1101011",
+    "0101010",
+    "0010100",
+    "0001000",
+  ],
 };
 function drawSprite(rows, x, y, cell, color, glow) {
   ctx.save();
@@ -428,9 +477,11 @@ const spriteSize = (rows, cell) => ({ w: rows[0].length * cell, h: rows.length *
 //  外星人種類設定
 // =========================================================================
 const ALIEN_TYPES = {
-  scout:   { hp: 1, points: 100, color: "#6dff8c", cell: 4, fire: 0.0006, bulletSpeed: 4.2, drop: 0.10 },
-  fighter: { hp: 2, points: 150, color: "#4af0ff", cell: 4, fire: 0.0014, bulletSpeed: 4.8, drop: 0.14 },
-  bomber:  { hp: 4, points: 280, color: "#ff7ad9", cell: 4, fire: 0.0022, bulletSpeed: 5.4, drop: 0.20 },
+  scout:    { hp: 1, points: 100, color: "#6dff8c", cell: 4, fire: 0.0006, bulletSpeed: 4.2, drop: 0.10 },
+  fighter:  { hp: 2, points: 150, color: "#4af0ff", cell: 4, fire: 0.0014, bulletSpeed: 4.8, drop: 0.14 },
+  bomber:   { hp: 4, points: 280, color: "#ff7ad9", cell: 4, fire: 0.0022, bulletSpeed: 5.4, drop: 0.20 },
+  splitter: { hp: 3, points: 220, color: "#ffd24a", cell: 4, fire: 0.0010, bulletSpeed: 4.6, drop: 0.16, split: 2 },
+  diver:    { hp: 2, points: 200, color: "#ff5a3c", cell: 4, fire: 0.0016, bulletSpeed: 5.0, drop: 0.14, homing: true },
 };
 
 // =========================================================================
@@ -454,8 +505,12 @@ const G = {
   survivalFrames: 0, spawnCd: 0, bossClock: 0,   // 無盡模式用
   high: +(localStorage.getItem("alienInvasionHigh") || 0),
   weapon: 1,                // 1~3 火力等級
+  weaponType: "blaster",    // blaster | laser | missile（後兩者限時）
+  weaponTimer: 0,
   combo: 0, comboTimer: 0,
   shake: 0,
+  hitstop: 0, flash: 0, flashColor: "#fff",   // 打擊感
+  kills: 0, flawless: true,                    // 成就用
   rapidTimer: 0, shieldTimer: 0,
   formationDir: 1, formationSpeed: 0.5, stepDown: 0,
 };
@@ -554,9 +609,9 @@ function spawnWave(level) {
   const startY = 90, gapY = 56;
 
   for (let r = 0; r < rows; r++) {
-    // 上排較硬、下排較弱
+    // 上排較硬、下排較弱；高關卡上排換成分裂體增加變化
     let type = "scout";
-    if (r === 0 && rows >= 3) type = "bomber";
+    if (r === 0 && rows >= 3) type = (level >= 4 && level % 2 === 0) ? "splitter" : "bomber";
     else if (r <= 1) type = "fighter";
     const def = ALIEN_TYPES[type];
     const sz = spriteSize(SPRITES[type], def.cell);
@@ -594,13 +649,53 @@ function spawnBoss(level) {
 // =========================================================================
 function playerShoot() {
   const cx = player.x + player.w / 2, y = player.y - 4;
-  const spd = -11;
-  const mk = (x, vx) => bullets.push({ x: x - 2.5, y, w: 5, h: 14, vx: vx || 0, vy: spd, dmg: 1 });
-  if (G.weapon === 1) mk(cx, 0);
-  else if (G.weapon === 2) { mk(cx - 9, 0); mk(cx + 9, 0); }
-  else { mk(cx, 0); mk(cx - 12, -2.2); mk(cx + 12, 2.2); }
+  if (G.weaponType === "laser") {                       // 雷射：穿透、細長、快
+    bullets.push({ x: cx - 2, y: y - 6, w: 4, h: 22, vx: 0, vy: -17, dmg: 1, pierce: true, kind: "laser" });
+  } else if (G.weaponType === "missile") {              // 導彈：追蹤、較慢、傷害高
+    const mk = vx => bullets.push({ x: cx - 3, y, w: 6, h: 12, vx, vy: -7, dmg: 2, homing: true, kind: "missile" });
+    if (G.weapon >= 2) { mk(-1.5); mk(1.5); } else mk(0);
+  } else {                                              // 預設藍射：依火力等級散射
+    const mk = (x, vx) => bullets.push({ x: x - 2.5, y, w: 5, h: 14, vx: vx || 0, vy: -11, dmg: 1, kind: "blaster" });
+    if (G.weapon === 1) mk(cx, 0);
+    else if (G.weapon === 2) { mk(cx - 9, 0); mk(cx + 9, 0); }
+    else { mk(cx, 0); mk(cx - 12, -2.2); mk(cx + 12, 2.2); }
+  }
   Sound.shoot();
 }
+// 導彈追蹤：朝最近敵人（含 Boss）轉向
+function homeBullet(b) {
+  let tx = null, ty = null, best = 1e9;
+  for (const a of aliens) { const dx = a.x + a.w / 2 - b.x, dy = a.y + a.h / 2 - b.y, d = dx * dx + dy * dy; if (d < best) { best = d; tx = a.x + a.w / 2; ty = a.y + a.h / 2; } }
+  if (boss && !boss.entering) { const dx = boss.x + boss.w / 2 - b.x, dy = boss.y + boss.h / 2 - b.y, d = dx * dx + dy * dy; if (d < best) { best = d; tx = boss.x + boss.w / 2; ty = boss.y + boss.h / 2; } }
+  if (tx === null) return;
+  const sp = Math.hypot(b.vx, b.vy) || 7;
+  let cur = Math.atan2(b.vy, b.vx);
+  let dAng = Math.atan2(ty - b.y, tx - b.x) - cur;
+  while (dAng > Math.PI) dAng -= 2 * Math.PI; while (dAng < -Math.PI) dAng += 2 * Math.PI;
+  cur += clamp(dAng, -0.14, 0.14);
+  b.vx = Math.cos(cur) * sp; b.vy = Math.sin(cur) * sp;
+}
+// 擊殺處理：計分、爆炸、掉寶、分裂、頓幀、成就
+function killAlien(a) {
+  const def = ALIEN_TYPES[a.type];
+  addScore(def.points, a.x + a.w / 2, a.y);
+  burst(a.x + a.w / 2, a.y + a.h / 2, def.color, def.split ? 22 : 16, 5);
+  Sound.explode();
+  maybeDropPower(a.x + a.w / 2, a.y, def.drop);
+  if (def.split) {                                      // 分裂成偵察兵
+    const sc = ALIEN_TYPES.scout, sz = spriteSize(SPRITES.scout, sc.cell);
+    for (let k = 0; k < def.split; k++) {
+      aliens.push({ type: "scout", hp: sc.hp, maxHp: sc.hp,
+        x: clamp(a.x + (k ? 14 : -14), 4, W - 4 - sz.w), y: a.y, w: sz.w, h: sz.h,
+        col: a.col || 0, baseY: a.y, vy: Math.max(0.5, (a.vy || 0) + rand(0, 0.5)), wob: rand(0, 6.28), flash: 0 });
+    }
+  }
+  if (def.hp >= 3 || def.split) hitstop(2);             // 大敵死亡頓幀
+  G.kills++;
+}
+// 打擊感：頓幀 + 全螢幕閃光
+function hitstop(f) { G.hitstop = Math.max(G.hitstop, f); }
+function screenFlash(color, amt) { G.flashColor = color; G.flash = Math.max(G.flash, amt); }
 function alienShoot(a) {
   const def = ALIEN_TYPES[a.type];
   eBullets.push({ x: a.x + a.w / 2 - 3, y: a.y + a.h, w: 6, h: 14, vy: def.bulletSpeed * diff().bspeed, type: "norm" });
@@ -651,29 +746,35 @@ function drawFloaters() {
 //  道具
 // =========================================================================
 const POWER_DEFS = {
-  spread: { color: "#ffd24a", label: "▲", name: "火力強化" },
-  rapid:  { color: "#4af0ff", label: "»",  name: "急速射擊" },
-  shield: { color: "#6dff8c", label: "◈", name: "能量護盾" },
-  life:   { color: "#ff4ec7", label: "♥", name: "增加戰機" },
+  spread:  { color: "#ffd24a", label: "▲", name: "火力強化" },
+  rapid:   { color: "#4af0ff", label: "»",  name: "急速射擊" },
+  shield:  { color: "#6dff8c", label: "◈", name: "能量護盾" },
+  life:    { color: "#ff4ec7", label: "♥", name: "增加戰機" },
+  laser:   { color: "#7df9ff", label: "≣", name: "穿透雷射" },
+  missile: { color: "#ff9b3c", label: "➤", name: "追蹤導彈" },
 };
 function maybeDropPower(x, y, chance) {
   if (Math.random() > chance) return;
   let type;
   const roll = Math.random();
-  if (roll < 0.06) type = "life";
-  else if (roll < 0.40) type = "spread";
-  else if (roll < 0.72) type = "rapid";
-  else type = "shield";
+  if (roll < 0.05) type = "life";
+  else if (roll < 0.30) type = "spread";
+  else if (roll < 0.52) type = "rapid";
+  else if (roll < 0.70) type = "shield";
+  else if (roll < 0.86) type = "laser";
+  else type = "missile";
   powerups.push({ x: x - 13, y, w: 26, h: 26, vy: 1.8, type, t: 0 });
 }
 function applyPower(type) {
   Sound.powerup();
   const d = POWER_DEFS[type];
   floatText(player.x + player.w / 2, player.y - 10, d.name, d.color);
-  if (type === "spread") G.weapon = Math.min(3, G.weapon + 1);
+  if (type === "spread") { G.weapon = Math.min(3, G.weapon + 1); if (G.weapon === 3) unlockAch("maxpower"); }
   else if (type === "rapid") G.rapidTimer = 60 * 8;
   else if (type === "shield") G.shieldTimer = 60 * 7;
   else if (type === "life") { G.lives = Math.min(5, G.lives + 1); }
+  else if (type === "laser") { G.weaponType = "laser"; G.weaponTimer = 60 * 10; unlockAch("laser"); }
+  else if (type === "missile") { G.weaponType = "missile"; G.weaponTimer = 60 * 10; unlockAch("missile"); }
 }
 function drawPowerup(p) {
   const d = POWER_DEFS[p.type], cx = p.x + p.w / 2, cy = p.y + p.h / 2;
@@ -694,6 +795,53 @@ function drawPowerup(p) {
   ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(d.label, 0, 1);
   ctx.restore();
+}
+
+// =========================================================================
+//  成就系統（localStorage）
+// =========================================================================
+const ACHIEVEMENTS = [
+  { id: "first_boss",  emoji: "👾", name: "首戰告捷", desc: "擊敗第一隻 Boss 母艦" },
+  { id: "boss_slayer", emoji: "💀", name: "母艦剋星", desc: "累計擊敗 5 隻 Boss" },
+  { id: "combo50",     emoji: "🔥", name: "連擊大師", desc: "單局達成 50 連擊" },
+  { id: "wave10",      emoji: "🏅", name: "防線英雄", desc: "闖關撐到第 10 波" },
+  { id: "survive60",   emoji: "⏱️", name: "生存專家", desc: "無盡模式存活 60 秒" },
+  { id: "maxpower",    emoji: "▲", name: "火力全開", desc: "火力升到滿級（3）" },
+  { id: "laser",       emoji: "≣", name: "雷射騎士", desc: "撿到穿透雷射" },
+  { id: "missile",     emoji: "➤", name: "飛彈專家", desc: "撿到追蹤導彈" },
+  { id: "score10k",    emoji: "🌟", name: "萬分達成", desc: "單局得分破 10000" },
+  { id: "flawless",    emoji: "🛡️", name: "零失誤", desc: "零失誤通過一波" },
+];
+function loadAch() { try { return new Set(JSON.parse(localStorage.getItem("alienInvasionAch") || "[]")); } catch (e) { return new Set(); } }
+function unlockAch(id) {
+  const set = loadAch();
+  if (set.has(id)) return;
+  const a = ACHIEVEMENTS.find(x => x.id === id); if (!a) return;
+  set.add(id);
+  localStorage.setItem("alienInvasionAch", JSON.stringify([...set]));
+  updateAchCounts();
+  showAchToast(a);
+}
+function updateAchCounts() {
+  const n = loadAch().size;
+  const a = $("achMenuCount"); if (a) a.textContent = n + "/" + ACHIEVEMENTS.length;
+  const b = $("achCount"); if (b) b.textContent = n + " / " + ACHIEVEMENTS.length;
+}
+function showAchToast(a) {
+  const el = $("achToast"); if (!el) return;
+  el.innerHTML = '<span class="ach-emoji">' + a.emoji + '</span><span><b>🏅 成就解鎖</b><br>' + a.name + '</span>';
+  el.classList.add("show");
+  clearTimeout(showAchToast._t);
+  showAchToast._t = setTimeout(() => el.classList.remove("show"), 2600);
+}
+function renderAchPanel() {
+  const set = loadAch(), el = $("achList"); if (!el) return;
+  $("achCount").textContent = set.size + " / " + ACHIEVEMENTS.length;
+  el.innerHTML = ACHIEVEMENTS.map(a => {
+    const got = set.has(a.id);
+    return '<div class="ach-item' + (got ? " got" : "") + '"><span class="ach-i-emoji">' + (got ? a.emoji : "🔒") +
+      '</span><span class="ach-i-text"><b>' + a.name + '</b><br><small>' + a.desc + '</small></span></div>';
+  }).join("");
 }
 
 // =========================================================================
@@ -737,13 +885,16 @@ canvas.addEventListener("touchmove",  e => { if (e.touches[0]) pointerMove(e.tou
 //  生命週期：開始 / 暫停 / 結束
 // =========================================================================
 const $ = id => document.getElementById(id);
-function show(id) { ["menu","pause","levelup","gameover"].forEach(s => $(s).classList.toggle("hidden", s !== id)); }
-function hideAll() { ["menu","pause","levelup","gameover"].forEach(s => $(s).classList.add("hidden")); }
+const SCREENS = ["menu","pause","levelup","gameover","achScreen"];
+function show(id) { SCREENS.forEach(s => $(s).classList.toggle("hidden", s !== id)); }
+function hideAll() { SCREENS.forEach(s => $(s).classList.add("hidden")); }
 
 function startGame() {
   Sound.resume(); Sound.startBGM();
   G.state = "playing"; G.score = 0; G.level = 1; G.lives = diff().lives;
-  G.weapon = 1; G.combo = 0; G.comboTimer = 0; G.shake = 0;
+  G.weapon = 1; G.weaponType = "blaster"; G.weaponTimer = 0;
+  G.combo = 0; G.comboTimer = 0; G.shake = 0; G.hitstop = 0; G.flash = 0;
+  G.kills = 0; G.flawless = true;
   G.rapidTimer = 0; G.shieldTimer = 0;
   G.survivalFrames = 0; G.spawnCd = 36; G.bossClock = 60 * 50;
   bullets = []; eBullets = []; particles = []; powerups = []; floaters = []; boss = null; aliens = [];
@@ -756,7 +907,10 @@ function togglePause() {
   else if (G.state === "paused") { G.state = "playing"; Sound.startBGM(); hideAll(); }
 }
 function nextLevel() {
+  if (G.flawless) unlockAch("flawless");
+  G.flawless = true;                    // 下一波重新計零失誤
   G.level++;
+  if (G.level >= 10) unlockAch("wave10");
   G.state = "levelup";
   const boss5 = G.level % 5 === 0;
   $("levelupTitle").textContent = boss5 ? "⚠ 母艦來襲！" : `第 ${G.level - 1} 波 清除！`;
@@ -773,7 +927,9 @@ function nextLevel() {
 function loseLife() {
   G.lives--;
   G.combo = 0;
+  G.flawless = false;
   G.shake = 16;
+  screenFlash("#ff2a6d", 0.45);
   Sound.hurt();
   burst(player.x + player.w / 2, player.y + player.h / 2, "#ff4ec7", 26, 6);
   if (G.lives <= 0) return gameOver();
@@ -915,6 +1071,9 @@ document.querySelectorAll(".diff-btn").forEach(b => {
 });
 // 音效開關
 $("soundToggle").onclick = () => { setMute(Sound.toggle()); };
+// 成就面板
+$("achBtn").onclick  = () => { renderAchPanel(); show("achScreen"); };
+$("achBack").onclick = () => { show("menu"); };
 // 留名儲存
 $("saveName").onclick = submitScore;
 $("nameInput").addEventListener("keydown", e => {
@@ -928,10 +1087,12 @@ $("nameInput").addEventListener("keydown", e => {
 function update() {
   updateStars();
   if (G.state !== "playing") return;
+  if (G.hitstop > 0) { G.hitstop--; return; }   // 頓幀：凍結 1~2 幀製造打擊感
 
   // ---- 計時器 ----
   if (G.rapidTimer > 0) G.rapidTimer--;
   if (G.shieldTimer > 0) G.shieldTimer--;
+  if (G.weaponTimer > 0) { G.weaponTimer--; if (G.weaponTimer === 0) G.weaponType = "blaster"; }
   if (G.comboTimer > 0) { G.comboTimer--; if (G.comboTimer === 0) G.combo = 0; }
   if (player.invuln > 0) player.invuln--;
   if (G.shake > 0) G.shake *= 0.85;
@@ -953,34 +1114,28 @@ function update() {
 
   // ---- 玩家子彈 ----
   for (let i = bullets.length - 1; i >= 0; i--) {
-    const b = bullets[i]; b.x += b.vx; b.y += b.vy;
-    if (b.y < -20 || b.x < -20 || b.x > W + 20) { bullets.splice(i, 1); continue; }
-    let hit = false;
+    const b = bullets[i];
+    if (b.homing) homeBullet(b);
+    b.x += b.vx; b.y += b.vy;
+    if (b.y < -24 || b.x < -24 || b.x > W + 24) { bullets.splice(i, 1); continue; }
+    let consumed = false;
     // 打小兵
     for (let j = aliens.length - 1; j >= 0; j--) {
       const a = aliens[j];
       if (aabb(b, a)) {
-        a.hp -= b.dmg; a.flash = 6; hit = true;
-        Sound.hit();
-        if (a.hp <= 0) {
-          const def = ALIEN_TYPES[a.type];
-          addScore(def.points, a.x + a.w / 2, a.y);
-          burst(a.x + a.w / 2, a.y + a.h / 2, def.color, 16, 5);
-          Sound.explode();
-          maybeDropPower(a.x + a.w / 2, a.y, def.drop);
-          aliens.splice(j, 1);
-        }
-        break;
+        a.hp -= b.dmg; a.flash = 6; Sound.hit();
+        if (a.hp <= 0) { killAlien(a); aliens.splice(j, 1); }
+        if (!b.pierce) { consumed = true; break; }   // 一般彈：命中即消；雷射穿透續飛
       }
     }
     // 打 Boss
-    if (!hit && boss && !boss.entering && aabb(b, boss)) {
-      boss.hp -= b.dmg; boss.flash = 4; hit = true;
-      Sound.hit();
+    if (!consumed && boss && !boss.entering && aabb(b, boss)) {
+      boss.hp -= b.dmg; boss.flash = 4; Sound.hit();
       burst(b.x, b.y, "#ffd24a", 5, 3);
       if (boss.hp <= 0) defeatBoss();
+      if (!b.pierce) consumed = true;
     }
-    if (hit) bullets.splice(i, 1);
+    if (consumed) bullets.splice(i, 1);
   }
 
   // ---- 外星艦隊移動 / 無盡模式持續生成 ----
@@ -1020,6 +1175,7 @@ function update() {
 function endlessUpdate() {
   G.survivalFrames++;
   if (G.survivalFrames % 60 === 0) G.score += 10;          // 存活加分
+  if (G.survivalFrames === 3600) unlockAch("survive60");
   const mins = G.survivalFrames / 3600;
   const tier = 1 + mins * 2;
 
@@ -1028,6 +1184,10 @@ function endlessUpdate() {
     const a = aliens[i];
     a.y += a.vy;
     a.wob += 0.04; a.x = clamp(a.x + Math.sin(a.wob) * 0.6, 4, W - 4 - a.w);
+    if (ALIEN_TYPES[a.type].homing && player) {           // 俯衝兵：朝玩家追擊
+      const dir = Math.sign((player.x + player.w / 2) - (a.x + a.w / 2));
+      a.x = clamp(a.x + dir * 1.1 * diff().speed, 4, W - 4 - a.w);
+    }
     if (a.flash > 0) a.flash--;
     if (Math.random() < ALIEN_TYPES[a.type].fire * 2.2 * diff().fire && eBullets.length < 16) alienShoot(a);
     if (a.y > H + 4) { aliens.splice(i, 1); loseLife(); }   // 突破底線 → 失誤
@@ -1042,7 +1202,12 @@ function endlessUpdate() {
 }
 function spawnDescender(tier) {
   const r = Math.random();
-  const type = r < 0.55 ? "scout" : r < 0.85 ? "fighter" : "bomber";
+  let type;
+  if (r < 0.42) type = "scout";
+  else if (r < 0.66) type = "fighter";
+  else if (r < 0.80) type = "diver";
+  else if (r < 0.92) type = "bomber";
+  else type = "splitter";
   const def = ALIEN_TYPES[type], sz = spriteSize(SPRITES[type], def.cell);
   const hp = def.hp + Math.floor(tier / 3);
   aliens.push({
@@ -1055,23 +1220,29 @@ function spawnDescender(tier) {
 }
 
 function updateFormation() {
+  const fAliens = aliens.filter(a => !a.vy);            // 陣型成員（無 vy）
   // 速度隨剩餘數量加快（經典手感）
-  const speed = G.formationSpeed * (1 + (1 - aliens.length / 30) * 1.4);
+  const speed = G.formationSpeed * (1 + (1 - Math.max(1, fAliens.length) / 30) * 1.4);
   let minX = Infinity, maxX = -Infinity;
-  for (const a of aliens) {
+  for (const a of fAliens) {
     a.x += G.formationDir * speed;
     a.wob += 0.05;
     minX = Math.min(minX, a.x); maxX = Math.max(maxX, a.x + a.w);
     if (a.flash > 0) a.flash--;
   }
   // 觸邊 → 反向 + 下降
-  if (maxX > W - 12 || minX < 12) {
+  if (fAliens.length && (maxX > W - 12 || minX < 12)) {
     G.formationDir *= -1;
-    for (const a of aliens) { a.x = clamp(a.x, 12, W - 12 - a.w); a.y += 24; a.baseY += 24; }
+    for (const a of fAliens) { a.x = clamp(a.x, 12, W - 12 - a.w); a.y += 24; a.baseY += 24; }
+  }
+  // 召喚兵 / 分裂兵（有 vy）：獨立落下
+  for (let i = aliens.length - 1; i >= 0; i--) {
+    const a = aliens[i];
+    if (a.vy) { a.y += a.vy; a.wob += 0.05; if (a.flash > 0) a.flash--; if (a.y > H + 6) aliens.splice(i, 1); }
   }
   // 隨機開火（取每欄最下方）
   const bottoms = {};
-  for (const a of aliens) if (!bottoms[a.col] || a.y > bottoms[a.col].y) bottoms[a.col] = a;
+  for (const a of fAliens) if (!bottoms[a.col] || a.y > bottoms[a.col].y) bottoms[a.col] = a;
   for (const col in bottoms) {
     const a = bottoms[col];
     if (Math.random() < ALIEN_TYPES[a.type].fire * (1 + G.level * 0.1) * diff().fire && eBullets.length < 14) alienShoot(a);
@@ -1080,12 +1251,12 @@ function updateFormation() {
   for (const a of aliens) {
     if (a.y + a.h >= player.y + 6) {
       if (playerHittable() && aabb(a, player)) { hitPlayer(); }
-      if (a.y + a.h >= H - 30) { loseLife(); resetFormationDown(); break; }
+      if (!a.vy && a.y + a.h >= H - 30) { loseLife(); resetFormationDown(); break; }
     }
   }
 }
 function resetFormationDown() {
-  for (const a of aliens) a.y -= 120;
+  for (const a of aliens) if (!a.vy) a.y -= 120;
 }
 
 function updateBoss() {
@@ -1096,28 +1267,44 @@ function updateBoss() {
     if (boss.y >= 60) { boss.y = 60; boss.entering = false; }
     return;
   }
+  // 狂暴化：血量低於 50% → 加速 + 更密集
+  if (!boss.enraged && boss.hp <= boss.maxHp * 0.5) { boss.enraged = true; boss.speed *= 1.4; screenFlash("#ff2a6d", 0.3); }
+  const er = boss.enraged ? 0.62 : 1;
+
   // 左右巡弋
   boss.x += boss.dir * boss.speed;
   if (boss.x < 10) { boss.x = 10; boss.dir = 1; }
   if (boss.x > W - boss.w - 10) { boss.x = W - boss.w - 10; boss.dir = -1; }
   boss.y = 60 + Math.sin(boss.t * 0.03) * 16;
 
-  // 攻擊型態
+  // 攻擊型態（5 種輪替）
   boss.fireCd--;
   if (boss.fireCd <= 0) {
     const cx = boss.x + boss.w / 2, by = boss.y + boss.h;
-    boss.pattern = (boss.pattern + 1) % 3;
+    boss.pattern = (boss.pattern + 1) % 5;
     if (boss.pattern === 0) {                       // 直線雙發
       eBullets.push({ x: boss.x + 30, y: by, w: 8, h: 16, vy: 5, type: "boss" });
       eBullets.push({ x: boss.x + boss.w - 38, y: by, w: 8, h: 16, vy: 5, type: "boss" });
     } else if (boss.pattern === 1) {                // 扇形散射
       for (let k = -2; k <= 2; k++)
         eBullets.push({ x: cx - 4, y: by, w: 8, h: 14, vx: k * 1.6, vy: 4.4, type: "boss" });
-    } else {                                        // 瞄準玩家
+    } else if (boss.pattern === 2) {                // 瞄準玩家
       const ang = Math.atan2(player.y - by, player.x + player.w / 2 - cx);
       eBullets.push({ x: cx - 5, y: by, w: 10, h: 16, vx: Math.cos(ang) * 5, vy: Math.sin(ang) * 5 + 1, type: "boss" });
+    } else if (boss.pattern === 3) {                // 環形彈幕
+      const n = boss.enraged ? 14 : 10;
+      for (let k = 0; k < n; k++) {
+        const a = (Math.PI * 2 / n) * k + boss.t * 0.05;
+        eBullets.push({ x: cx - 4, y: boss.y + boss.h / 2, w: 8, h: 8, vx: Math.cos(a) * 3.2, vy: Math.abs(Math.sin(a)) * 2.4 + 1.4, type: "boss" });
+      }
+    } else {                                        // 召喚小兵
+      for (let k = -1; k <= 1; k += 2) {
+        const sc = ALIEN_TYPES.scout, sz = spriteSize(SPRITES.scout, sc.cell);
+        aliens.push({ type: "scout", hp: sc.hp, maxHp: sc.hp, x: clamp(cx + k * 40, 4, W - 4 - sz.w),
+          y: by, w: sz.w, h: sz.h, col: 0, baseY: by, vy: 1.6 * diff().speed, wob: rand(0, 6.28), flash: 0 });
+      }
     }
-    boss.fireCd = Math.max(22, Math.round((70 - G.level * 2) / diff().fire));
+    boss.fireCd = Math.max(18, Math.round((70 - G.level * 2) / diff().fire * er));
   }
   // 接觸玩家
   if (playerHittable() && aabb(boss, player)) hitPlayer();
@@ -1127,8 +1314,12 @@ function defeatBoss() {
   for (let i = 0; i < 6; i++)
     setTimeout(() => burst(boss.x + rand(0, boss.w), boss.y + rand(0, boss.h), pick(["#ffd24a","#ff4ec7","#4af0ff"]), 22, 7), i * 90);
   addScore(2000 + G.level * 200, boss.x + boss.w / 2, boss.y + 20);
-  G.shake = 20;
+  G.shake = 20; hitstop(8); screenFlash("#ffffff", 0.6);
   boss = null;
+  const bk = (+(localStorage.getItem("alienInvasionBossKills") || 0)) + 1;
+  localStorage.setItem("alienInvasionBossKills", bk);
+  unlockAch("first_boss");
+  if (bk >= 5) unlockAch("boss_slayer");
 }
 
 function playerHittable() { return player.invuln <= 0 && G.shieldTimer <= 0; }
@@ -1147,6 +1338,8 @@ function addScore(base, x, y) {
   const gained = Math.round(base * mult);
   G.score += gained;
   floatText(x, y, "+" + gained, mult > 1 ? "#ffd24a" : "#eaf6ff");
+  if (G.combo >= 50) unlockAch("combo50");
+  if (G.score >= 10000) unlockAch("score10k");
 }
 
 // =========================================================================
@@ -1237,7 +1430,9 @@ function drawHUD() {
     ctx.fillText(label, bx + 6, by + 10);
     ctx.globalAlpha = 1; bx += 72;
   };
-  badge("火力 " + G.weapon, "#ffd24a", G.weapon > 1);
+  if (G.weaponType === "laser") badge("雷射", "#7df9ff", true, G.weaponTimer / (60 * 10));
+  else if (G.weaponType === "missile") badge("導彈", "#ff9b3c", true, G.weaponTimer / (60 * 10));
+  else badge("火力 " + G.weapon, "#ffd24a", G.weapon > 1);
   badge("急速", "#4af0ff", G.rapidTimer > 0, G.rapidTimer / (60 * 8));
   badge("護盾", "#6dff8c", G.shieldTimer > 0, G.shieldTimer / (60 * 7));
   if (G.combo >= 5) {
@@ -1258,7 +1453,7 @@ function render() {
     powerups.forEach(drawPowerup);
     aliens.forEach(drawAlien);
     if (boss) drawBoss();
-    bullets.forEach(b => drawBullet(b, "#fff7a8"));
+    bullets.forEach(b => drawBullet(b, b.kind === "laser" ? "#7df9ff" : b.kind === "missile" ? "#ff9b3c" : "#fff7a8"));
     eBullets.forEach(b => drawBullet(b, b.type === "boss" ? "#ff2a6d" : "#ff7ad9"));
     drawParticles();
     if (player) drawShip(player);
@@ -1267,6 +1462,13 @@ function render() {
     drawParticles();
   }
   ctx.restore();
+
+  // 打擊感閃光（疊在最上層，含螢幕震動外）
+  if (G.flash > 0.02) {
+    ctx.save(); ctx.globalAlpha = Math.min(0.7, G.flash); ctx.fillStyle = G.flashColor || "#fff";
+    ctx.fillRect(0, 0, W, H); ctx.restore();
+    if (G.state === "playing") G.flash *= 0.84; else G.flash = 0;
+  }
 
   if (G.state === "playing" || G.state === "paused" || G.state === "levelup") drawHUD();
 }
@@ -1342,6 +1544,7 @@ initStars();
 makePlayer();
 $("schoolBadge").src = makeBadgeDataURL();
 refreshLB("menuLeaderboard");
+updateAchCounts();
 show("menu");
 requestAnimationFrame(loop);
 </script>
