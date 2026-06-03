@@ -190,7 +190,7 @@
   .ach-i-text small { color: #8fa2c8; font-size: 11px; }
 
   /* ---------- 設定 ---------- */
-  .set-list { width: min(340px, 88%); display: flex; flex-direction: column; gap: 8px; }
+  .set-list { width: min(340px, 88%); display: flex; flex-direction: column; gap: 8px; max-height: 44%; overflow-y: auto; }
   .set-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;
     background: rgba(13,9,48,0.6); border: 1px solid #2a2658; border-radius: 12px; padding: 12px 14px;
     text-align: left; font-size: 14px; color: #eaf6ff; }
@@ -214,6 +214,14 @@
   .tb-bar .track { flex: 1; height: 14px; background: rgba(255,255,255,0.06); border-radius: 7px; overflow: hidden; }
   .tb-bar .fill { height: 100%; background: linear-gradient(90deg, var(--neon), var(--neon-green)); border-radius: 7px; }
   .tb-bar .num { width: 30px; text-align: left; flex-shrink: 0; color: #9ab0dd; }
+
+  /* ---------- 關卡編輯器 ---------- */
+  .ed-hint { font-size: 11px; color: #8fa2c8; max-width: 320px; line-height: 1.5; }
+  .ed-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; width: min(320px, 86%); }
+  .ed-cell { aspect-ratio: 1; border: 1px solid #2a2658; border-radius: 6px; background: rgba(13,9,48,0.6);
+    font-size: 17px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; color: #56617e; }
+  .ed-cell[data-t="1"] { border-color: #6dff8c; } .ed-cell[data-t="2"] { border-color: #4af0ff; }
+  .ed-cell[data-t="3"] { border-color: #ff7ad9; } .ed-cell[data-t="4"] { border-color: #ffd24a; }
   .class-timer {
     position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 6;
     font-family: 'Trebuchet MS', monospace; font-weight: 800; font-size: 14px;
@@ -308,6 +316,7 @@
       <button class="btn" id="installBtn" style="display:none">📲 加入主畫面（安裝 App）</button>
       <p class="ios-hint" id="iosHint" style="display:none">iPhone / iPad：點瀏覽器「分享 ↗ → 加入主畫面」即可安裝</p>
       <button class="btn secondary" id="teacherBtn">📊 老師後台 / 數據</button>
+      <button class="btn secondary" id="editorBtn">🛠️ 關卡編輯器</button>
       <button class="btn secondary" id="setBack">返回 ◂</button>
     </div>
 
@@ -331,6 +340,22 @@
       <div class="row">
         <button class="btn secondary" id="teacherRefresh" style="padding:9px 18px">↻ 重新整理</button>
         <button class="btn secondary" id="teacherBack" style="padding:9px 18px">返回 ◂</button>
+      </div>
+    </div>
+
+    <!-- 關卡編輯器 -->
+    <div class="screen hidden" id="editorScreen">
+      <h1 class="title" style="font-size:clamp(22px,5.5vw,34px)">🛠️ 關卡編輯器</h1>
+      <p class="ed-hint">點格子切換敵人：· → 👾偵察 → 🛸戰鬥 → 💣轟炸 → ✦分裂 → 空</p>
+      <div class="ed-grid" id="edGrid"></div>
+      <div class="ct-btns">
+        <button class="diff-btn" id="edClear">🗑️ 清空</button>
+        <button class="diff-btn" id="edShare">🔗 分享代碼</button>
+        <button class="diff-btn" id="edLoad">📥 載入代碼</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="edPlay" style="padding:11px 24px">▶ 試玩</button>
+        <button class="btn secondary" id="edBack" style="padding:11px 18px">返回 ◂</button>
       </div>
     </div>
 
@@ -1054,6 +1079,44 @@ async function renderTeacher() {
 }
 
 // =========================================================================
+//  🛠️ 關卡編輯器
+// =========================================================================
+const ED_COLS = 7, ED_ROWS = 5;
+const ED_TYPES = [null, "scout", "fighter", "bomber", "splitter"];
+const ED_EMOJI = ["·", "👾", "🛸", "💣", "✦"];
+let editorGrid = (() => {
+  const s = localStorage.getItem("alienEditorGrid") || "";
+  return (s.length === ED_COLS * ED_ROWS && /^[0-4]+$/.test(s)) ? s.split("").map(Number) : Array(ED_COLS * ED_ROWS).fill(0);
+})();
+let customGrid = null;
+function saveEditorGrid() { localStorage.setItem("alienEditorGrid", editorGrid.join("")); }
+function renderEditorGrid() {
+  const el = $("edGrid"); if (!el) return;
+  el.innerHTML = editorGrid.map((t, i) => '<button class="ed-cell" data-t="' + t + '" data-i="' + i + '">' + ED_EMOJI[t] + '</button>').join("");
+  el.querySelectorAll(".ed-cell").forEach(b => {
+    b.onclick = () => { const i = +b.dataset.i; editorGrid[i] = (editorGrid[i] + 1) % 5; b.dataset.t = editorGrid[i]; b.textContent = ED_EMOJI[editorGrid[i]]; saveEditorGrid(); };
+  });
+}
+function spawnCustomWave(grid) {
+  aliens = []; boss = null;
+  const marginX = 56, gapX = (W - marginX * 2) / ED_COLS, startY = 86, gapY = 58;
+  for (let r = 0; r < ED_ROWS; r++) for (let c = 0; c < ED_COLS; c++) {
+    const t = grid[r * ED_COLS + c]; if (!t) continue;
+    const type = ED_TYPES[t], def = ALIEN_TYPES[type], sz = spriteSize(SPRITES[type], def.cell);
+    aliens.push({ type, hp: def.hp, maxHp: def.hp, x: marginX + c * gapX + (gapX - sz.w) / 2, y: startY + r * gapY,
+      w: sz.w, h: sz.h, col: c, baseY: startY + r * gapY, wob: rand(0, 6.28), flash: 0 });
+  }
+  G.formationDir = 1; G.formationSpeed = 0.5 * diff().speed;
+}
+function customWin() { G.won = true; G.score += 1500; gameOver(); }
+function encodeGrid() { return "SM-" + editorGrid.join(""); }
+function decodeGrid(code) {
+  const m = String(code || "").trim().replace(/^SM-/i, "");
+  if (m.length !== ED_COLS * ED_ROWS || !/^[0-4]+$/.test(m)) return false;
+  editorGrid = m.split("").map(Number); saveEditorGrid(); renderEditorGrid(); return true;
+}
+
+// =========================================================================
 //  輸入
 // =========================================================================
 const keys = {};
@@ -1094,7 +1157,7 @@ canvas.addEventListener("touchmove",  e => { if (e.touches[0]) pointerMove(e.tou
 //  生命週期：開始 / 暫停 / 結束
 // =========================================================================
 const $ = id => document.getElementById(id);
-const SCREENS = ["menu","pause","levelup","gameover","achScreen","setScreen","breakScreen","quizSetup","teacherScreen"];
+const SCREENS = ["menu","pause","levelup","gameover","achScreen","setScreen","breakScreen","quizSetup","teacherScreen","editorScreen"];
 function show(id) { SCREENS.forEach(s => $(s).classList.toggle("hidden", s !== id)); }
 function hideAll() { SCREENS.forEach(s => $(s).classList.add("hidden")); }
 
@@ -1112,6 +1175,7 @@ function startGame() {
   makePlayer();
   if (G.mode === "campaign") spawnWave(1);        // 無盡 / 每日由 endlessUpdate 持續生成
   else if (G.mode === "quiz") spawnQuestion();    // 答題：出第一題
+  else if (G.mode === "custom") spawnCustomWave(customGrid || editorGrid);  // 自製關卡
   else if (G.mode === "story") { startStory(); return; }  // 劇情：先播旁白卡
   hideAll();
 }
@@ -1187,11 +1251,12 @@ function gameOver() {
   G.state = "gameover";
   Sound.stopBGM();
   if (G.won) Sound.levelup(); else Sound.over();
-  $("goTitle").textContent = G.won ? "🎉 石門守住了！" : "遊戲結束";
+  $("goTitle").textContent = G.won ? (G.mode === "custom" ? "🎉 自製關卡破關！" : "🎉 石門守住了！") : "遊戲結束";
   if (G.score > G.high) { G.high = G.score; localStorage.setItem("alienInvasionHigh", G.high); }
   $("finalScore").textContent = G.score.toLocaleString();
   $("finalHigh").textContent  = G.high.toLocaleString();
-  $("finalProgress").textContent = G.won ? "🛡️ 劇情通關·外星艦隊撤退！"
+  $("finalProgress").textContent = (G.won && G.mode === "custom") ? "🛠️ 自製關卡完成！"
+    : G.won ? "🛡️ 劇情通關·外星艦隊撤退！"
     : G.mode === "quiz"
     ? ("答對 " + G.quizCorrect + " 題（" + (QUIZ_SUBJ[G.quizSubject] || "") + "）")
     : endlessLike()
@@ -1386,6 +1451,24 @@ document.querySelectorAll(".quiz-sub").forEach(b => { b.onclick = () => { G.quiz
 $("teacherBtn").onclick     = () => { renderTeacher(); show("teacherScreen"); };
 $("teacherBack").onclick    = () => show("setScreen");
 $("teacherRefresh").onclick = renderTeacher;
+// 關卡編輯器
+$("editorBtn").onclick = () => { renderEditorGrid(); show("editorScreen"); };
+$("edBack").onclick    = () => show("setScreen");
+$("edClear").onclick   = () => { editorGrid = Array(ED_COLS * ED_ROWS).fill(0); saveEditorGrid(); renderEditorGrid(); };
+$("edShare").onclick   = () => {
+  const code = encodeGrid();
+  const fb = () => { const b = $("edShare"); const o = b.textContent; b.textContent = "✓ 已複製!"; setTimeout(() => b.textContent = o, 1500); };
+  if (navigator.clipboard) navigator.clipboard.writeText(code).then(fb, () => prompt("複製這段代碼分享：", code));
+  else prompt("複製這段代碼分享：", code);
+};
+$("edLoad").onclick = () => {
+  const code = prompt("貼上關卡代碼（SM-…）：");
+  if (code != null && !decodeGrid(code)) alert("代碼格式不正確");
+};
+$("edPlay").onclick = () => {
+  if (editorGrid.every(t => t === 0)) { const b = $("edPlay"); const o = b.textContent; b.textContent = "先放些敵人！"; setTimeout(() => b.textContent = o, 1400); return; }
+  G.mode = "custom"; customGrid = editorGrid.slice(); startGame();
+};
 
 // 模式選擇（闖關 / 無盡）
 document.querySelectorAll(".mode-btn").forEach(b => {
@@ -1600,10 +1683,11 @@ function update() {
 
   updateParticles(); updateFloaters();
 
-  // ---- 過關判定（闖關 / 劇情）----
+  // ---- 過關判定（闖關 / 劇情 / 自製）----
   if (!aliens.length && !boss) {
     if (G.mode === "story") storyAdvance();
     else if (G.mode === "campaign") nextLevel();
+    else if (G.mode === "custom") customWin();
   }
 }
 
