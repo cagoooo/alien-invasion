@@ -58,8 +58,8 @@
     position: absolute; inset: 0;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    text-align: center; gap: 10px;
-    padding: 16px;
+    text-align: center; gap: 8px;
+    padding: 14px;
     background: rgba(5,3,15,0.82);
     backdrop-filter: blur(3px);
     z-index: 5;
@@ -246,6 +246,7 @@
         <button class="mode-btn" data-mode="endless">無盡</button>
         <button class="mode-btn" data-mode="daily">📅 每日</button>
         <button class="mode-btn" data-mode="quiz">🎯 答題</button>
+        <button class="mode-btn" data-mode="story">📖 劇情</button>
       </div>
       <div class="diff-group">
         <span class="diff-label">年級</span>
@@ -632,7 +633,7 @@ const DIFFICULTY = {
 };
 const diff = () => DIFFICULTY[G.difficulty];
 const endlessLike = () => G.mode === "endless" || G.mode === "daily";   // 無盡 / 每日皆持續生成
-const modeName = () => G.mode === "daily" ? "每日挑戰" : G.mode === "endless" ? "無盡" : G.mode === "quiz" ? "答題" : "闖關";
+const modeName = () => G.mode === "daily" ? "每日挑戰" : G.mode === "endless" ? "無盡" : G.mode === "quiz" ? "答題" : G.mode === "story" ? "劇情" : "闖關";
 const QUIZ_SUBJ = { math: "數學", en: "英文", sci: "自然" };
 
 // =========================================================================
@@ -642,8 +643,9 @@ const G = {
   state: "menu",            // menu | playing | paused | levelup | gameover
   score: 0, level: 1, lives: 3,
   difficulty: "normal",     // easy | normal | hard
-  mode: "campaign",         // campaign 闖關 | endless 無盡 | daily 每日 | quiz 答題
+  mode: "campaign",         // campaign | endless | daily | quiz | story
   quizSubject: "math", question: null, qIndex: 0, quizCorrect: 0,
+  storyStage: 0, won: false,                      // 劇情模式
   survivalFrames: 0, spawnCd: 0, bossClock: 0,   // 無盡模式用
   high: +(localStorage.getItem("alienInvasionHigh") || 0),
   weapon: 1,                // 1~3 火力等級
@@ -1041,12 +1043,13 @@ function startGame() {
   G.kills = 0; G.flawless = true;
   G.rapidTimer = 0; G.shieldTimer = 0;
   G.survivalFrames = 0; G.spawnCd = 36; G.bossClock = 60 * 50;
-  G.qIndex = 0; G.quizCorrect = 0; G.question = null;
+  G.qIndex = 0; G.quizCorrect = 0; G.question = null; G.won = false;
   if (G.mode === "daily") seedRng(dailySeed());   // 每日挑戰：全校今天同一套敵人序列
   bullets = []; eBullets = []; particles = []; powerups = []; floaters = []; boss = null; aliens = [];
   makePlayer();
   if (G.mode === "campaign") spawnWave(1);        // 無盡 / 每日由 endlessUpdate 持續生成
   else if (G.mode === "quiz") spawnQuestion();    // 答題：出第一題
+  else if (G.mode === "story") { startStory(); return; }  // 劇情：先播旁白卡
   hideAll();
 }
 function startOrSetup() { if (G.mode === "quiz") show("quizSetup"); else startGame(); }
@@ -1072,6 +1075,39 @@ function nextLevel() {
     Sound.levelup();
   }, 1600);
 }
+
+// ---------- 📖 保衛石門 劇情關 ----------
+const STORY = [
+  { t: "⚠ 警報", d: "不明飛行物逼近桃園上空，石門防衛隊緊急升空！", go: () => spawnWave(1) },
+  { t: "第一波攻勢", d: "外星偵察隊試探我們的防線，別讓它們碰到地面！", go: () => spawnWave(2) },
+  { t: "戰鬥機群", d: "敵方戰鬥機加入戰局，它們會反擊，專心走位閃彈！", go: () => spawnWave(3) },
+  { t: "轟炸機壓境", d: "重裝轟炸機來了，火力集中！為石門撐住！", go: () => spawnWave(4) },
+  { t: "母艦前鋒", d: "分裂體與俯衝兵打頭陣，巨型母艦就在後面…", go: () => spawnWave(6) },
+  { t: "⚔ 決戰母艦", d: "母艦現身石門上空！為了學校與同學，全力一戰！", go: () => spawnBoss(7) },
+];
+function startStory() { G.storyStage = -1; storyAdvance(); }
+function storyAdvance() {
+  G.storyStage++;
+  if (G.storyStage >= STORY.length) return storyVictory();
+  const s = STORY[G.storyStage];
+  G.state = "levelup";
+  $("levelupTitle").textContent = s.t;
+  $("levelupMsg").textContent = s.d;
+  show("levelup");
+  setTimeout(() => {
+    if (G.state !== "levelup") return;
+    bullets = []; eBullets = []; aliens = []; boss = null;
+    s.go();
+    G.state = "playing"; hideAll();
+    Sound.levelup();
+  }, 2200);
+}
+function storyVictory() {
+  G.won = true;
+  G.score += 5000;                       // 通關獎勵
+  unlockAch("wave10");                   // 通關劇情也算戰功
+  gameOver();
+}
 function loseLife() {
   G.lives--;
   G.combo = 0;
@@ -1087,10 +1123,13 @@ function loseLife() {
 function gameOver() {
   G.state = "gameover";
   Sound.stopBGM();
+  if (G.won) Sound.levelup(); else Sound.over();
+  $("goTitle").textContent = G.won ? "🎉 石門守住了！" : "遊戲結束";
   if (G.score > G.high) { G.high = G.score; localStorage.setItem("alienInvasionHigh", G.high); }
   $("finalScore").textContent = G.score.toLocaleString();
   $("finalHigh").textContent  = G.high.toLocaleString();
-  $("finalProgress").textContent = G.mode === "quiz"
+  $("finalProgress").textContent = G.won ? "🛡️ 劇情通關·外星艦隊撤退！"
+    : G.mode === "quiz"
     ? ("答對 " + G.quizCorrect + " 題（" + (QUIZ_SUBJ[G.quizSubject] || "") + "）")
     : endlessLike()
     ? (modeName() + " 存活 " + Math.floor(G.survivalFrames / 60) + " 秒")
@@ -1104,7 +1143,6 @@ function gameOver() {
   refreshLB("goLeaderboard");
   G.scoreSaved = false; G.submitting = false;
   show("gameover");
-  Sound.over();
 }
 function setMute(m) { $("soundToggle").textContent = m ? "🔇" : "🔊"; }
 
@@ -1495,8 +1533,11 @@ function update() {
 
   updateParticles(); updateFloaters();
 
-  // ---- 過關判定（僅闖關模式）----
-  if (G.mode === "campaign" && !aliens.length && !boss) nextLevel();
+  // ---- 過關判定（闖關 / 劇情）----
+  if (!aliens.length && !boss) {
+    if (G.mode === "story") storyAdvance();
+    else if (G.mode === "campaign") nextLevel();
+  }
 }
 
 // =========================================================================
@@ -1836,7 +1877,9 @@ function drawHUD() {
   // 波數 / 存活時間 + 難度（置中）
   if (!boss) {
     ctx.textAlign = "center"; ctx.fillStyle = "#4af0ff"; ctx.font = "bold 13px sans-serif";
-    const label = G.mode === "quiz" ? ("答對 " + G.quizCorrect + " 題") : endlessLike() ? ("存活 " + Math.floor(G.survivalFrames / 60) + "s") : ("第 " + G.level + " 波");
+    const label = G.mode === "quiz" ? ("答對 " + G.quizCorrect + " 題")
+      : G.mode === "story" ? ("劇情 " + (G.storyStage + 1) + "/" + STORY.length)
+      : endlessLike() ? ("存活 " + Math.floor(G.survivalFrames / 60) + "s") : ("第 " + G.level + " 波");
     ctx.fillText(label, W / 2, 14);
     const d = diff(); ctx.fillStyle = d.color; ctx.font = "11px sans-serif";
     const sub = G.mode === "quiz" ? (" · " + (QUIZ_SUBJ[G.quizSubject] || "")) : (G.mode !== "campaign" ? " · " + modeName() : "");
