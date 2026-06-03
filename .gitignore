@@ -3,3 +3,12 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+
+# Firebase 部署 / 驗證工具（指向 penguin-leaderboard 後端，不屬於本遊戲 repo）
+.firebaserc
+firebase.json
+firestore.rules
+firestore.indexes.json
+firebase-debug.log
+penguin-original-rules.bak
+test-cloud.js
