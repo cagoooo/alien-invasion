@@ -200,6 +200,20 @@
   .ct-btns { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
   .quiz-subjects { display: flex; flex-direction: column; gap: 10px; width: min(300px, 84%); }
   .quiz-subjects .btn { width: 100%; }
+
+  /* ---------- 老師後台 / 數據儀表板 ---------- */
+  .teacher-body { width: min(380px, 92%); max-height: 64%; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  .tb-cards { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .tb-card { flex: 1; min-width: 70px; background: rgba(13,9,48,0.6); border: 1px solid #2a2658; border-radius: 10px; padding: 8px 6px; }
+  .tb-card .v { font-size: 22px; font-weight: 900; color: var(--neon); }
+  .tb-card .k { font-size: 11px; color: #8fa2c8; }
+  .tb-sec { text-align: left; }
+  .tb-sec h3 { font-size: 13px; color: #ffd24a; margin-bottom: 6px; font-weight: 800; }
+  .tb-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #eaf6ff; margin-bottom: 4px; }
+  .tb-bar .lab { width: 64px; text-align: right; flex-shrink: 0; color: #b9c8e6; }
+  .tb-bar .track { flex: 1; height: 14px; background: rgba(255,255,255,0.06); border-radius: 7px; overflow: hidden; }
+  .tb-bar .fill { height: 100%; background: linear-gradient(90deg, var(--neon), var(--neon-green)); border-radius: 7px; }
+  .tb-bar .num { width: 30px; text-align: left; flex-shrink: 0; color: #9ab0dd; }
   .class-timer {
     position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 6;
     font-family: 'Trebuchet MS', monospace; font-weight: 800; font-size: 14px;
@@ -293,6 +307,7 @@
       </div>
       <button class="btn" id="installBtn" style="display:none">📲 加入主畫面（安裝 App）</button>
       <p class="ios-hint" id="iosHint" style="display:none">iPhone / iPad：點瀏覽器「分享 ↗ → 加入主畫面」即可安裝</p>
+      <button class="btn secondary" id="teacherBtn">📊 老師後台 / 數據</button>
       <button class="btn secondary" id="setBack">返回 ◂</button>
     </div>
 
@@ -307,6 +322,16 @@
         <button class="btn quiz-sub" data-subject="sci">🔬 自然常識</button>
       </div>
       <button class="btn secondary" id="quizBack">返回 ◂</button>
+    </div>
+
+    <!-- 老師後台 / 數據儀表板 -->
+    <div class="screen hidden" id="teacherScreen">
+      <h1 class="title" style="font-size:clamp(22px,5.5vw,36px)">📊 老師後台</h1>
+      <div class="teacher-body" id="teacherBody"></div>
+      <div class="row">
+        <button class="btn secondary" id="teacherRefresh" style="padding:9px 18px">↻ 重新整理</button>
+        <button class="btn secondary" id="teacherBack" style="padding:9px 18px">返回 ◂</button>
+      </div>
     </div>
 
     <!-- 下課時間到 -->
@@ -990,6 +1015,44 @@ function renderAchPanel() {
   }).join("");
 }
 
+// 老師後台 / 數據儀表板：聚合雲端近期紀錄
+async function renderTeacher() {
+  const el = $("teacherBody");
+  el.innerHTML = '<div class="lb-empty">載入分析資料中…</div>';
+  if (!window.Cloud || !window.Cloud.ready) { el.innerHTML = '<div class="lb-empty">需連上雲端才能看後台<br>（本機開發版連不到，正式站可用）</div>'; return; }
+  const data = await window.Cloud.allRecent(400);
+  if (!data) { el.innerHTML = '<div class="lb-empty">暫時連不上雲端，請稍後再試</div>'; return; }
+  if (!data.length) { el.innerHTML = '<div class="lb-empty">還沒有任何遊玩紀錄</div>'; return; }
+  const total = data.length;
+  const ds = new Date(); ds.setHours(0, 0, 0, 0); const todayStart = ds.getTime();
+  const today = data.filter(r => r.ts >= todayStart).length;
+  const scores = data.map(r => r.score);
+  const avg = Math.round(scores.reduce((a, b) => a + b, 0) / total);
+  const max = Math.max.apply(null, scores);
+  const dc = { easy: 0, normal: 0, hard: 0 };
+  data.forEach(r => { if (dc[r.diff] != null) dc[r.diff]++; });
+  const dmax = Math.max(1, dc.easy, dc.normal, dc.hard);
+  const cb = {};
+  data.forEach(r => { if (r.class) cb[r.class] = Math.max(cb[r.class] || 0, r.score); });
+  const tops = Object.entries(cb).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const cmax = Math.max(1, ...tops.map(t => t[1]));
+  const bar = (lab, val, mx, num) => '<div class="tb-bar"><span class="lab">' + escapeHtml(lab) +
+    '</span><span class="track"><span class="fill" style="width:' + Math.round(val / mx * 100) + '%"></span></span><span class="num">' + num + '</span></div>';
+  el.innerHTML =
+    '<div class="tb-cards">' +
+      '<div class="tb-card"><div class="v">' + total + '</div><div class="k">場次(近400)</div></div>' +
+      '<div class="tb-card"><div class="v">' + today + '</div><div class="k">今日場次</div></div>' +
+      '<div class="tb-card"><div class="v">' + avg.toLocaleString() + '</div><div class="k">平均分</div></div>' +
+      '<div class="tb-card"><div class="v">' + max.toLocaleString() + '</div><div class="k">最高分</div></div>' +
+    '</div>' +
+    '<div class="tb-sec"><h3>📊 年級難度分布</h3>' +
+      bar("低年級", dc.easy, dmax, dc.easy) + bar("中年級", dc.normal, dmax, dc.normal) + bar("高年級", dc.hard, dmax, dc.hard) +
+    '</div>' +
+    '<div class="tb-sec"><h3>🏫 班級最高分 TOP</h3>' +
+      (tops.length ? tops.map(t => bar(t[0], t[1], cmax, t[1].toLocaleString())).join("") : '<div class="lb-empty">尚無班級資料（上傳時填班級就會出現）</div>') +
+    '</div>';
+}
+
 // =========================================================================
 //  輸入
 // =========================================================================
@@ -1031,7 +1094,7 @@ canvas.addEventListener("touchmove",  e => { if (e.touches[0]) pointerMove(e.tou
 //  生命週期：開始 / 暫停 / 結束
 // =========================================================================
 const $ = id => document.getElementById(id);
-const SCREENS = ["menu","pause","levelup","gameover","achScreen","setScreen","breakScreen","quizSetup"];
+const SCREENS = ["menu","pause","levelup","gameover","achScreen","setScreen","breakScreen","quizSetup","teacherScreen"];
 function show(id) { SCREENS.forEach(s => $(s).classList.toggle("hidden", s !== id)); }
 function hideAll() { SCREENS.forEach(s => $(s).classList.add("hidden")); }
 
@@ -1319,6 +1382,10 @@ $("shareBtn").onclick   = shareScoreCard;
 // 答題科目選擇
 $("quizBack").onclick   = () => show("menu");
 document.querySelectorAll(".quiz-sub").forEach(b => { b.onclick = () => { G.quizSubject = b.dataset.subject; startGame(); }; });
+// 老師後台
+$("teacherBtn").onclick     = () => { renderTeacher(); show("teacherScreen"); };
+$("teacherBack").onclick    = () => show("setScreen");
+$("teacherRefresh").onclick = renderTeacher;
 
 // 模式選擇（闖關 / 無盡）
 document.querySelectorAll(".mode-btn").forEach(b => {
@@ -2083,6 +2150,14 @@ requestAnimationFrame(loop);
         const snap = await getDocs(query(collection(db, COLL), orderBy("score", "desc"), limit(n)));
         return snap.docs.map(d => d.data());
       } catch (e) { console.warn("讀取全校排行榜失敗", e); return null; }
+    },
+    // 老師後台分析：抓近期 N 筆（含時間戳）
+    async allRecent(n = 300) {
+      if (!db) return null;
+      try {
+        const snap = await getDocs(query(collection(db, COLL), orderBy("createdAt", "desc"), limit(n)));
+        return snap.docs.map(d => { const x = d.data(); return { name: x.name, score: x.score || 0, level: x.level || 1, diff: x.diff || "normal", class: x.class || "", ts: x.createdAt && x.createdAt.toMillis ? x.createdAt.toMillis() : 0 }; });
+      } catch (e) { console.warn("讀取分析資料失敗", e); return null; }
     },
     // 限時段排行榜（今日 / 本週）：抓近期紀錄後依分數排序取前 n
     async topByTime(n, sinceMs) {
