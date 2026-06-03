@@ -58,8 +58,8 @@
     position: absolute; inset: 0;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    text-align: center; gap: 12px;
-    padding: 18px;
+    text-align: center; gap: 10px;
+    padding: 16px;
     background: rgba(5,3,15,0.82);
     backdrop-filter: blur(3px);
     z-index: 5;
@@ -109,31 +109,33 @@
   .school-badge { width: clamp(78px, 21vw, 122px); height: auto;
     filter: drop-shadow(0 0 16px rgba(74,240,255,0.5)); animation: bob 3s ease-in-out infinite; }
 
-  /* ---------- 難度選擇 ---------- */
-  .diff-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
-  .diff-label { font-size: 13px; color: #8fa2c8; margin-right: 2px; }
-  .diff-btn {
-    cursor: pointer; font-family: inherit; font-weight: 700; font-size: 14px;
-    color: #b9c8e6; padding: 7px 17px; border-radius: 999px;
+  /* ---------- 模式 / 難度選擇 ---------- */
+  .diff-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .diff-label { font-size: 12px; color: #8fa2c8; margin-right: 1px; }
+  .diff-btn, .mode-btn {
+    cursor: pointer; font-family: inherit; font-weight: 700; font-size: 13px;
+    color: #b9c8e6; padding: 6px 13px; border-radius: 999px;
     background: rgba(26,22,64,0.6); border: 1px solid #3a3470; transition: all .15s ease;
   }
   .diff-btn.active { color: #05030f; background: var(--neon); border-color: var(--neon); box-shadow: 0 0 14px rgba(74,240,255,0.5); }
   .diff-btn[data-diff="easy"].active { background: var(--neon-green); border-color: var(--neon-green); box-shadow: 0 0 14px rgba(109,255,140,0.5); }
   .diff-btn[data-diff="hard"].active { background: var(--neon-pink); border-color: var(--neon-pink); box-shadow: 0 0 14px rgba(255,78,199,0.5); }
+  .mode-btn.active { color: #05030f; background: #c9a8ff; border-color: #c9a8ff; box-shadow: 0 0 14px rgba(201,168,255,0.5); }
 
   /* ---------- 名人堂排行榜 ---------- */
   .leaderboard { width: min(320px, 82%); display: flex; flex-direction: column; gap: 3px; }
   .lb-title { font-size: 13px; color: #ffd24a; letter-spacing: 2px; margin-bottom: 3px; }
-  .lb-tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 5px; }
+  .lb-tabs { display: flex; gap: 5px; justify-content: center; margin-bottom: 5px; }
   .lb-tab { cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 700; color: #8fa2c8;
-    background: rgba(26,22,64,0.5); border: 1px solid #3a3470; border-radius: 999px; padding: 4px 14px; transition: all .15s; }
+    background: rgba(26,22,64,0.5); border: 1px solid #3a3470; border-radius: 999px; padding: 4px 11px; transition: all .15s; white-space: nowrap; }
   .lb-tab.active { color: #05030f; background: #ffd24a; border-color: #ffd24a; }
   .lb-row { display: flex; align-items: center; gap: 8px; font-size: 14px;
     background: rgba(13,9,48,0.55); border-radius: 7px; padding: 5px 12px; }
   .lb-rank { width: 22px; text-align: center; }
   .lb-name { flex: 1; text-align: left; color: #eaf6ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-cls { font-size: 10px; color: #8fa2c8; background: rgba(74,240,255,0.12); border-radius: 5px; padding: 1px 5px; margin-left: 2px; }
   .lb-score { color: var(--neon); font-weight: 800; font-variant-numeric: tabular-nums; }
-  .lb-empty { font-size: 12px; color: #6f7fa6; padding: 6px; }
+  .lb-empty { font-size: 12px; color: #6f7fa6; padding: 6px; line-height: 1.5; }
 
   /* ---------- 留名輸入 ---------- */
   .name-entry { display: flex; flex-direction: column; gap: 9px; align-items: center;
@@ -141,13 +143,15 @@
     border-radius: 14px; padding: 13px 18px; }
   .name-entry.hidden { display: none; }
   .name-entry .ne-title { font-size: 14px; color: #ffd24a; font-weight: 800; }
-  .name-row { display: flex; gap: 8px; }
+  .name-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
   .name-input {
     font-family: inherit; font-size: 16px; color: #fff; text-align: center;
-    width: 150px; padding: 9px 12px; border-radius: 10px;
+    width: 120px; padding: 9px 12px; border-radius: 10px;
     background: #0d0930; border: 1px solid #3a3470; outline: none;
   }
+  .name-input.class-input { width: 72px; }
   .name-input:focus { border-color: var(--neon); }
+  .ne-error { display: none; font-size: 12px; color: #ff7a9c; font-weight: 700; }
 
   /* ---------- 音效開關 ---------- */
   .sound-toggle {
@@ -186,12 +190,14 @@
       <img id="schoolBadge" class="school-badge" alt="石門國小校徽" />
       <h1 class="title">外星人入侵<span class="en">保衛石門 · DEFEND SHIH MEN</span></h1>
       <p class="subtitle">
-        外星艦隊入侵桃園上空！<b>石門國小防衛隊</b>，起飛迎戰 🛸<br>
-        <b>電腦</b> <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 移動·自動開火 · <kbd>P</kbd> 暫停<br>
-        <span class="hint-mobile"><b>手機</b> 手指滑動操控戰機</span>
+        石門國小防衛隊，起飛迎戰外星艦隊 🛸<br>
+        <b>電腦</b> <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 移動 · <b>手機</b> 滑動操控 · 自動開火
       </p>
       <div class="diff-group">
-        <span class="diff-label">難度</span>
+        <span class="diff-label">模式</span>
+        <button class="mode-btn active" data-mode="campaign">闖關</button>
+        <button class="mode-btn" data-mode="endless">無盡</button>
+        <span class="diff-label" style="margin-left:6px">難度</span>
         <button class="diff-btn" data-diff="easy">簡單</button>
         <button class="diff-btn active" data-diff="normal">普通</button>
         <button class="diff-btn" data-diff="hard">困難</button>
@@ -200,6 +206,7 @@
       <div class="leaderboard">
         <div class="lb-tabs">
           <button class="lb-tab active" data-scope="global">🌏 全校</button>
+          <button class="lb-tab" data-scope="class">🏫 我們班</button>
           <button class="lb-tab" data-scope="local">📱 本機</button>
         </div>
         <div id="menuLeaderboard"></div>
@@ -231,15 +238,18 @@
       <p class="stat-line">本次得分 <span class="big" id="finalScore">0</span></p>
       <p class="subtitle">最高分：<b id="finalHigh">0</b> · 抵達第 <b id="finalLevel">1</b> 波</p>
       <div class="name-entry hidden" id="nameEntry">
-        <span class="ne-title">🏆 留下你的名字，登上全校排行榜！</span>
+        <span class="ne-title">🏆 留下名字 + 班級，登上全校排行榜！</span>
         <div class="name-row">
-          <input class="name-input" id="nameInput" maxlength="10" placeholder="輸入暱稱" autocomplete="off" />
-          <button class="btn" id="saveName" style="padding:9px 22px;font-size:15px">上傳</button>
+          <input class="name-input" id="nameInput" maxlength="10" placeholder="暱稱" autocomplete="off" />
+          <input class="name-input class-input" id="classInput" maxlength="6" placeholder="班級" autocomplete="off" />
+          <button class="btn" id="saveName" style="padding:9px 20px;font-size:15px">上傳</button>
         </div>
+        <div class="ne-error" id="neError"></div>
       </div>
       <div class="leaderboard">
         <div class="lb-tabs">
           <button class="lb-tab active" data-scope="global">🌏 全校</button>
+          <button class="lb-tab" data-scope="class">🏫 我們班</button>
           <button class="lb-tab" data-scope="local">📱 本機</button>
         </div>
         <div id="goLeaderboard"></div>
@@ -313,10 +323,50 @@ const Sound = (() => {
     src.connect(f).connect(g).connect(a.destination);
     src.start(t);
   }
+  // ---- BGM：程序合成 chiptune 迴圈（零外部檔案、可離線；復古太空主題）----
+  let bgmGain = null, bgmOn = false, bgmTimer = null, bgmNextT = 0, bgmBar = 0;
+  const HZ = { A2:110, F2:87.31, C3:130.81, G2:98, A3:220, B3:246.94, C4:261.63, D4:293.66, E4:329.63, F3:174.61, G3:196, G4:392 };
+  const BARS = [   // Am – F – C – G 經典上行進行
+    { bass: HZ.A2, arp: [HZ.A3, HZ.C4, HZ.E4, HZ.C4] },
+    { bass: HZ.F2, arp: [HZ.F3, HZ.A3, HZ.C4, HZ.A3] },
+    { bass: HZ.C3, arp: [HZ.C4, HZ.E4, HZ.G4, HZ.E4] },
+    { bass: HZ.G2, arp: [HZ.G3, HZ.B3, HZ.D4, HZ.B3] },
+  ];
+  const BAR_DUR = 1.55;
+  function bgmVoice(freq, t, dur, type, vol) {
+    const a = ac(); if (!a || !bgmGain) return;
+    const osc = a.createOscillator(), g = a.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    osc.connect(g).connect(bgmGain);
+    osc.start(t); osc.stop(t + dur + 0.05);
+  }
+  function bgmSchedule() {
+    if (!bgmOn) return;
+    const a = ac();
+    if (a) while (bgmNextT < a.currentTime + 0.35) {
+      const bar = BARS[bgmBar % BARS.length], t0 = bgmNextT, sd = BAR_DUR / 4;
+      bgmVoice(bar.bass, t0, BAR_DUR * 0.92, "square", 0.05);          // 低音
+      bgmVoice(bar.bass * 2, t0 + sd * 2, sd, "square", 0.025);        // 八度點綴
+      bar.arp.forEach((f, i) => bgmVoice(f, t0 + i * sd, sd * 0.85, "triangle", 0.04));  // 琶音
+      bgmNextT += BAR_DUR; bgmBar++;
+    }
+    bgmTimer = setTimeout(bgmSchedule, 130);   // 用 setTimeout 而非 rAF（分頁隱藏時仍續排程）
+  }
   return {
     resume() { const a = ac(); if (a && a.state === "suspended") a.resume(); },
-    toggle() { muted = !muted; return muted; },
+    toggle() { muted = !muted; if (bgmGain) bgmGain.gain.value = muted ? 0 : 1; return muted; },
     isMuted() { return muted; },
+    startBGM() {
+      const a = ac(); if (!a) return;
+      if (!bgmGain) { bgmGain = a.createGain(); bgmGain.connect(a.destination); }
+      bgmGain.gain.value = muted ? 0 : 1;
+      if (bgmOn) return;
+      bgmOn = true; bgmNextT = a.currentTime + 0.12; bgmSchedule();
+    },
+    stopBGM() { bgmOn = false; if (bgmTimer) { clearTimeout(bgmTimer); bgmTimer = null; } },
     shoot()    { tone(880, 0.08, "square", 0.05, 1400); },
     hit()      { tone(220, 0.06, "sawtooth", 0.10, 140); },
     explode()  { noise(0.32, 0.30); tone(120, 0.3, "sawtooth", 0.10, 50); },
@@ -400,6 +450,8 @@ const G = {
   state: "menu",            // menu | playing | paused | levelup | gameover
   score: 0, level: 1, lives: 3,
   difficulty: "normal",     // easy | normal | hard
+  mode: "campaign",         // campaign 闖關 | endless 無盡
+  survivalFrames: 0, spawnCd: 0, bossClock: 0,   // 無盡模式用
   high: +(localStorage.getItem("alienInvasionHigh") || 0),
   weapon: 1,                // 1~3 火力等級
   combo: 0, comboTimer: 0,
@@ -661,6 +713,11 @@ addEventListener("keydown", e => {
 });
 addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
 
+// 切到背景分頁 → 自動暫停（避免空跑誤死、省電）
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && G.state === "playing") togglePause();
+});
+
 // 指標（滑鼠 + 觸控）
 function pointerMove(clientX) {
   if (G.state !== "playing" || !player) return;
@@ -680,16 +737,19 @@ function show(id) { ["menu","pause","levelup","gameover"].forEach(s => $(s).clas
 function hideAll() { ["menu","pause","levelup","gameover"].forEach(s => $(s).classList.add("hidden")); }
 
 function startGame() {
-  Sound.resume();
+  Sound.resume(); Sound.startBGM();
   G.state = "playing"; G.score = 0; G.level = 1; G.lives = diff().lives;
   G.weapon = 1; G.combo = 0; G.comboTimer = 0; G.shake = 0;
   G.rapidTimer = 0; G.shieldTimer = 0;
-  bullets = []; eBullets = []; particles = []; powerups = []; floaters = [];
-  makePlayer(); spawnWave(1); hideAll();
+  G.survivalFrames = 0; G.spawnCd = 36; G.bossClock = 60 * 50;
+  bullets = []; eBullets = []; particles = []; powerups = []; floaters = []; boss = null; aliens = [];
+  makePlayer();
+  if (G.mode === "campaign") spawnWave(1);   // 無盡模式由 endlessUpdate 持續生成
+  hideAll();
 }
 function togglePause() {
-  if (G.state === "playing") { G.state = "paused"; show("pause"); }
-  else if (G.state === "paused") { G.state = "playing"; hideAll(); }
+  if (G.state === "playing") { G.state = "paused"; Sound.stopBGM(); show("pause"); }
+  else if (G.state === "paused") { G.state = "playing"; Sound.startBGM(); hideAll(); }
 }
 function nextLevel() {
   G.level++;
@@ -718,12 +778,15 @@ function loseLife() {
 }
 function gameOver() {
   G.state = "gameover";
+  Sound.stopBGM();
   if (G.score > G.high) { G.high = G.score; localStorage.setItem("alienInvasionHigh", G.high); }
   $("finalScore").textContent = G.score.toLocaleString();
   $("finalHigh").textContent  = G.high.toLocaleString();
   $("finalLevel").textContent = G.level;
   // 有分數就可上傳（本機 + 全校）
   $("nameInput").value = "";
+  $("classInput").value = localStorage.getItem("alienInvasionClass") || "";
+  showNeError("");
   $("nameEntry").classList.toggle("hidden", !(G.score > 0));
   refreshLB("goLeaderboard");
   G.scoreSaved = false;
@@ -739,58 +802,93 @@ function escapeHtml(s) {
 function loadLB() { try { return JSON.parse(localStorage.getItem("alienInvasionLB") || "[]"); } catch (e) { return []; } }
 function saveLB(lb) { localStorage.setItem("alienInvasionLB", JSON.stringify(lb.slice(0, 5))); }
 function lbQualifies(score) { const lb = loadLB(); return score > 0 && (lb.length < 5 || score > lb[lb.length - 1].score); }
-function renderLB(elId) {
-  const el = $(elId); if (!el) return;
-  const lb = loadLB();
-  if (!lb.length) { el.innerHTML = '<div class="lb-empty">尚無紀錄 — 當第一位英雄！</div>'; return; }
-  const rank = ["🥇", "🥈", "🥉", "4", "5"];
-  el.innerHTML = lb.map((r, i) =>
-    `<div class="lb-row"><span class="lb-rank">${rank[i]}</span>` +
-    `<span class="lb-name">${escapeHtml(r.name)}</span>` +
-    `<span class="lb-score">${(r.score || 0).toLocaleString()}</span></div>`
-  ).join("");
+const RANK = ["🥇", "🥈", "🥉", "4", "5", "6", "7", "8", "9", "10"];
+function lbRowsHtml(rows) {
+  return rows.map((r, i) => {
+    const c = r.class || r.cls;
+    return `<div class="lb-row"><span class="lb-rank">${RANK[i] || (i + 1)}</span>` +
+      `<span class="lb-name">${escapeHtml(r.name)}${c ? ` <span class="lb-cls">${escapeHtml(c)}</span>` : ""}</span>` +
+      `<span class="lb-score">${(r.score || 0).toLocaleString()}</span></div>`;
+  }).join("");
 }
-// ---------- 全校 / 本機 分頁切換 ----------
-let lbScope = "global";   // 'global'（雲端 Firestore）| 'local'（localStorage）
-function refreshLB(elId) { if (lbScope === "global") renderGlobalLB(elId); else renderLB(elId); }
-async function renderGlobalLB(elId) {
+function myClass() { return localStorage.getItem("alienInvasionClass") || ""; }
+function lbCount(elId) { return elId === "menuLeaderboard" ? 3 : 5; }   // 選單精簡、結算完整
+
+function renderLB(elId) {                       // 📱 本機
+  const el = $(elId); if (!el) return;
+  const lb = loadLB().slice(0, lbCount(elId));
+  el.innerHTML = lb.length ? lbRowsHtml(lb) : '<div class="lb-empty">尚無紀錄 — 當第一位英雄！</div>';
+}
+async function renderGlobalLB(elId) {           // 🌏 全校
   const el = $(elId); if (!el) return;
   if (!window.Cloud || !window.Cloud.ready) { el.innerHTML = '<div class="lb-empty">🌏 雲端連線中…（離線時可看「本機」分頁）</div>'; return; }
   el.innerHTML = '<div class="lb-empty">載入全校排行榜…</div>';
-  const rows = await window.Cloud.top(5);
+  const rows = await window.Cloud.top(lbCount(elId));
   if (!rows) { el.innerHTML = '<div class="lb-empty">暫時連不上雲端，請看「本機」分頁</div>'; return; }
-  if (!rows.length) { el.innerHTML = '<div class="lb-empty">全校還沒人上榜 — 當第一個英雄！</div>'; return; }
-  const rank = ["🥇", "🥈", "🥉", "4", "5"];
-  el.innerHTML = rows.map((r, i) =>
-    `<div class="lb-row"><span class="lb-rank">${rank[i] || (i + 1)}</span>` +
-    `<span class="lb-name">${escapeHtml(r.name)}</span>` +
-    `<span class="lb-score">${(r.score || 0).toLocaleString()}</span></div>`
-  ).join("");
+  el.innerHTML = rows.length ? lbRowsHtml(rows) : '<div class="lb-empty">全校還沒人上榜 — 當第一個英雄！</div>';
+}
+async function renderClassLB(elId) {            // 🏫 我們班
+  const el = $(elId); if (!el) return;
+  const cls = myClass();
+  if (!cls) { el.innerHTML = '<div class="lb-empty">玩一場、上傳時填「班級」，就能看我們班排名 🏫</div>'; return; }
+  if (!window.Cloud || !window.Cloud.ready) { el.innerHTML = '<div class="lb-empty">🌏 雲端連線中…</div>'; return; }
+  el.innerHTML = '<div class="lb-empty">載入「' + escapeHtml(cls) + '」排名…</div>';
+  const all = await window.Cloud.top(60);
+  if (!all) { el.innerHTML = '<div class="lb-empty">暫時連不上雲端</div>'; return; }
+  const rows = all.filter(r => (r.class || "") === cls).slice(0, lbCount(elId));
+  el.innerHTML = rows.length ? lbRowsHtml(rows) : '<div class="lb-empty">「' + escapeHtml(cls) + '」還沒人上榜 — 當班上第一個！</div>';
+}
+
+// ---------- 分頁切換（全校 / 我們班 / 本機）----------
+let lbScope = "global";   // 'global' | 'class' | 'local'
+function refreshLB(elId) {
+  if (lbScope === "global") renderGlobalLB(elId);
+  else if (lbScope === "class") renderClassLB(elId);
+  else renderLB(elId);
 }
 function visibleLBId() { return G.state === "gameover" ? "goLeaderboard" : "menuLeaderboard"; }
 
+// 不雅暱稱過濾（清單可擴充）
+const BANNED = ["幹","操你","操妳","媽的","他媽","你媽","妳媽","靠北","靠邀","雞掰","機掰","三小","賤人","婊","屌","智障","白痴","白癡","廢物","去死","死全家","北七","低能","幹你","幹妳","fuck","shit","bitch","dick","asshole","cunt"];
+function isCleanName(s) { const t = String(s).toLowerCase().replace(/\s+/g, ""); return !BANNED.some(w => t.includes(w)); }
+function showNeError(msg) { const e = $("neError"); if (e) { e.textContent = msg; e.style.display = msg ? "block" : "none"; } }
+
 function submitScore() {
   if (G.scoreSaved) return;
-  const name = (($("nameInput").value || "").trim() || "無名英雄").slice(0, 10);
+  const raw = ($("nameInput").value || "").trim();
+  if (!isCleanName(raw)) { showNeError("暱稱包含不適當文字，請換一個 🙏"); return; }
+  showNeError("");
+  const name = (raw || "無名英雄").slice(0, 10);
+  const cls = ($("classInput").value || "").trim().slice(0, 8);
+  if (cls) localStorage.setItem("alienInvasionClass", cls);
   // 本機
   const lb = loadLB();
-  lb.push({ name, score: G.score, level: G.level, diff: G.difficulty });
+  lb.push({ name, score: G.score, level: G.level, diff: G.difficulty, cls });
   lb.sort((a, b) => b.score - a.score);
   saveLB(lb);
   G.scoreSaved = true;
   $("nameEntry").classList.add("hidden");
   // 雲端（非同步，不阻塞）
   if (window.Cloud && window.Cloud.ready) {
-    window.Cloud.submit(name, G.score, G.level, G.difficulty).then(ok => { if (ok && lbScope === "global") refreshLB("goLeaderboard"); });
+    window.Cloud.submit(name, G.score, G.level, G.difficulty, cls).then(ok => { if (ok && lbScope !== "local") refreshLB("goLeaderboard"); });
   }
   refreshLB("goLeaderboard"); refreshLB("menuLeaderboard");
 }
 
 $("startBtn").onclick   = startGame;
 $("resumeBtn").onclick  = togglePause;
-$("quitBtn").onclick    = () => { G.state = "menu"; refreshLB("menuLeaderboard"); show("menu"); };
+$("quitBtn").onclick    = () => { Sound.stopBGM(); G.state = "menu"; refreshLB("menuLeaderboard"); show("menu"); };
 $("restartBtn").onclick = startGame;
-$("menuBtn").onclick    = () => { G.state = "menu"; refreshLB("menuLeaderboard"); show("menu"); };
+$("menuBtn").onclick    = () => { Sound.stopBGM(); G.state = "menu"; refreshLB("menuLeaderboard"); show("menu"); };
+
+// 模式選擇（闖關 / 無盡）
+document.querySelectorAll(".mode-btn").forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll(".mode-btn").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    G.mode = b.dataset.mode;
+  };
+});
 
 // 排行榜分頁（全校 / 本機）
 document.querySelectorAll(".lb-tab").forEach(b => {
@@ -881,8 +979,9 @@ function update() {
     if (hit) bullets.splice(i, 1);
   }
 
-  // ---- 外星艦隊移動 ----
-  if (aliens.length) updateFormation();
+  // ---- 外星艦隊移動 / 無盡模式持續生成 ----
+  if (G.mode === "endless") endlessUpdate();
+  else if (aliens.length) updateFormation();
 
   // ---- Boss ----
   if (boss) updateBoss();
@@ -907,8 +1006,48 @@ function update() {
 
   updateParticles(); updateFloaters();
 
-  // ---- 過關判定 ----
-  if (!aliens.length && !boss) nextLevel();
+  // ---- 過關判定（僅闖關模式）----
+  if (G.mode === "campaign" && !aliens.length && !boss) nextLevel();
+}
+
+// =========================================================================
+//  無盡模式：敵人從上方持續落下，活越久難度越高
+// =========================================================================
+function endlessUpdate() {
+  G.survivalFrames++;
+  if (G.survivalFrames % 60 === 0) G.score += 10;          // 存活加分
+  const mins = G.survivalFrames / 3600;
+  const tier = 1 + mins * 2;
+
+  // 移動每隻落下的敵人
+  for (let i = aliens.length - 1; i >= 0; i--) {
+    const a = aliens[i];
+    a.y += a.vy;
+    a.wob += 0.04; a.x = clamp(a.x + Math.sin(a.wob) * 0.6, 4, W - 4 - a.w);
+    if (a.flash > 0) a.flash--;
+    if (Math.random() < ALIEN_TYPES[a.type].fire * 2.2 * diff().fire && eBullets.length < 16) alienShoot(a);
+    if (a.y > H + 4) { aliens.splice(i, 1); loseLife(); }   // 突破底線 → 失誤
+  }
+
+  if (!boss) {
+    G.spawnCd--;
+    if (G.spawnCd <= 0) { spawnDescender(tier); G.spawnCd = Math.max(16, Math.round(58 - mins * 13)); }
+    G.bossClock--;
+    if (G.bossClock <= 0) { spawnBoss(Math.round(3 + mins * 3)); G.bossClock = 60 * 50; }
+  }
+}
+function spawnDescender(tier) {
+  const r = Math.random();
+  const type = r < 0.55 ? "scout" : r < 0.85 ? "fighter" : "bomber";
+  const def = ALIEN_TYPES[type], sz = spriteSize(SPRITES[type], def.cell);
+  const hp = def.hp + Math.floor(tier / 3);
+  aliens.push({
+    type, hp, maxHp: hp,
+    x: rand(10, W - 10 - sz.w), y: -sz.h - 8,
+    w: sz.w, h: sz.h, col: 0,
+    vy: rand(0.7, 1.3) * (0.9 + tier * 0.12) * diff().speed,
+    wob: rand(0, Math.PI * 2), flash: 0,
+  });
 }
 
 function updateFormation() {
@@ -1065,12 +1204,13 @@ function drawHUD() {
   ctx.fillStyle = "#7f93bf"; ctx.font = "11px sans-serif";
   ctx.fillText("最高 " + G.high.toLocaleString(), 16, boss ? 58 : 40);
 
-  // 波數 + 難度（置中）
+  // 波數 / 存活時間 + 難度（置中）
   if (!boss) {
     ctx.textAlign = "center"; ctx.fillStyle = "#4af0ff"; ctx.font = "bold 13px sans-serif";
-    ctx.fillText("第 " + G.level + " 波", W / 2, 14);
+    const label = G.mode === "endless" ? ("存活 " + Math.floor(G.survivalFrames / 60) + "s") : ("第 " + G.level + " 波");
+    ctx.fillText(label, W / 2, 14);
     const d = diff(); ctx.fillStyle = d.color; ctx.font = "11px sans-serif";
-    ctx.fillText(d.name, W / 2, 32);
+    ctx.fillText(d.name + (G.mode === "endless" ? " · 無盡" : ""), W / 2, 32);
   }
 
   // 生命（左上，戰機圖示；避開右上角音效鈕）
@@ -1229,16 +1369,19 @@ requestAnimationFrame(loop);
 
   window.Cloud = {
     get ready() { return !!(db && uid); },
-    async submit(name, score, level, diff) {
+    async submit(name, score, level, diff, cls) {
       if (!db || !uid) return false;
       try {
-        await addDoc(collection(db, COLL), {
+        const doc = {
           name: String(name).slice(0, 12) || "無名英雄",
           score: Math.max(0, Math.min(100000000, Math.floor(score || 0))),
           level: Math.max(1, Math.min(999, Math.floor(level || 1))),
           diff: String(diff || "normal").slice(0, 8),
           uid, createdAt: serverTimestamp(),
-        });
+        };
+        const c = (cls == null ? "" : String(cls)).trim().slice(0, 8);
+        if (c) doc.class = c;
+        await addDoc(collection(db, COLL), doc);
         return true;
       } catch (e) { console.warn("分數上傳失敗", e); return false; }
     },
