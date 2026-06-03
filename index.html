@@ -196,6 +196,16 @@
   .set-item small { color: #8fa2c8; font-size: 11px; }
   .set-item input { width: 22px; height: 22px; accent-color: var(--neon-green); flex-shrink: 0; }
   .ios-hint { font-size: 12px; color: #8fa2c8; max-width: 320px; line-height: 1.5; }
+  .ct-btns { display: flex; gap: 6px; justify-content: center; }
+  .class-timer {
+    position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 6;
+    font-family: 'Trebuchet MS', monospace; font-weight: 800; font-size: 14px;
+    color: #ffd24a; background: rgba(13,9,48,0.78); border: 1px solid rgba(255,210,74,0.5);
+    border-radius: 999px; padding: 4px 14px; letter-spacing: 1px;
+  }
+  .class-timer.hidden { display: none; }
+  .class-timer.urgent { color: #ff4ec7; border-color: var(--neon-pink); animation: ctpulse .8s ease-in-out infinite; }
+  @keyframes ctpulse { 0%,100%{ opacity: 1 } 50%{ opacity: .5 } }
 
   /* ---------- 頁尾署名 ---------- */
   .site-credit {
@@ -220,6 +230,7 @@
     <canvas id="game" width="600" height="800"></canvas>
     <button class="sound-toggle" id="soundToggle" title="音效開關 (M)">🔊</button>
     <div class="ach-toast" id="achToast"></div>
+    <div class="class-timer hidden" id="classTimer">⏲️ 10:00</div>
 
     <!-- 開始選單 -->
     <div class="screen" id="menu">
@@ -256,10 +267,30 @@
       <div class="set-list">
         <label class="set-item"><span>🌀 減少動態<br><small>關閉螢幕震動、減少粒子（暈動症友善）</small></span><input type="checkbox" id="setRM"></label>
         <label class="set-item"><span>👁️ 色盲友善<br><small>敵方子彈加白色描邊，更好辨識</small></span><input type="checkbox" id="setCB"></label>
+        <div class="set-item" style="flex-direction:column;align-items:stretch;gap:8px">
+          <span>⏲️ 下課計時器<br><small id="ctState">老師用：時間到提醒孩子收心</small></span>
+          <div class="ct-btns">
+            <button class="diff-btn" data-min="0">關閉</button>
+            <button class="diff-btn" data-min="5">5 分</button>
+            <button class="diff-btn" data-min="10">10 分</button>
+            <button class="diff-btn" data-min="15">15 分</button>
+          </div>
+        </div>
       </div>
       <button class="btn" id="installBtn" style="display:none">📲 加入主畫面（安裝 App）</button>
       <p class="ios-hint" id="iosHint" style="display:none">iPhone / iPad：點瀏覽器「分享 ↗ → 加入主畫面」即可安裝</p>
       <button class="btn secondary" id="setBack">返回 ◂</button>
+    </div>
+
+    <!-- 下課時間到 -->
+    <div class="screen hidden" id="breakScreen">
+      <div class="alien-deco" style="animation:none">⏰</div>
+      <h1 class="title" style="font-size:clamp(26px,7vw,46px)">下課時間到！</h1>
+      <p class="subtitle">外星人先休兵～<br>收收心、喝口水，準備上課囉 📚</p>
+      <div class="row">
+        <button class="btn" id="breakExtend">再玩 5 分鐘</button>
+        <button class="btn secondary" id="breakDone">結束休息</button>
+      </div>
     </div>
 
     <!-- 成就徽章 -->
@@ -953,7 +984,7 @@ canvas.addEventListener("touchmove",  e => { if (e.touches[0]) pointerMove(e.tou
 //  生命週期：開始 / 暫停 / 結束
 // =========================================================================
 const $ = id => document.getElementById(id);
-const SCREENS = ["menu","pause","levelup","gameover","achScreen","setScreen"];
+const SCREENS = ["menu","pause","levelup","gameover","achScreen","setScreen","breakScreen"];
 function show(id) { SCREENS.forEach(s => $(s).classList.toggle("hidden", s !== id)); }
 function hideAll() { SCREENS.forEach(s => $(s).classList.add("hidden")); }
 
@@ -1269,6 +1300,44 @@ $("installBtn").onclick = async () => {
   const standalone = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone;
   if (isIOS && !standalone) $("iosHint").style.display = "";
 })();
+
+// ---------- 下課計時器（老師用：時間到提醒收心）----------
+let classTimerEnd = +(localStorage.getItem("alienClassTimerEnd") || 0) || null;
+let breakPrevState = "menu";
+function setClassTimer(min) {
+  if (min > 0) { classTimerEnd = Date.now() + min * 60000; localStorage.setItem("alienClassTimerEnd", classTimerEnd); }
+  else { classTimerEnd = null; localStorage.removeItem("alienClassTimerEnd"); }
+  document.querySelectorAll(".ct-btns .diff-btn").forEach(b => b.classList.toggle("active", +b.dataset.min === (min || 0)));
+  $("ctState").textContent = min > 0 ? ("倒數中 · " + min + " 分鐘") : "老師用：時間到提醒孩子收心";
+  tickClassTimer();
+}
+function tickClassTimer() {
+  const chip = $("classTimer");
+  if (!classTimerEnd) { chip.classList.add("hidden"); return; }
+  const ms = classTimerEnd - Date.now();
+  if (ms <= 0) { fireBreak(); return; }
+  const s = Math.ceil(ms / 1000), m = Math.floor(s / 60);
+  chip.textContent = "⏲️ " + m + ":" + String(s % 60).padStart(2, "0");
+  chip.classList.remove("hidden");
+  chip.classList.toggle("urgent", ms <= 60000);
+}
+function fireBreak() {
+  classTimerEnd = null; localStorage.removeItem("alienClassTimerEnd");
+  $("classTimer").classList.add("hidden");
+  document.querySelectorAll(".ct-btns .diff-btn").forEach(b => b.classList.toggle("active", b.dataset.min === "0"));
+  $("ctState").textContent = "老師用：時間到提醒孩子收心";
+  breakPrevState = G.state === "playing" || G.state === "paused" ? "playing" : "menu";
+  if (G.state === "playing") G.state = "paused";
+  Sound.stopBGM();
+  show("breakScreen");
+}
+function restoreFromBreak() {
+  if (breakPrevState === "playing") { G.state = "playing"; Sound.startBGM(); hideAll(); }
+  else { G.state = "menu"; refreshLB("menuLeaderboard"); show("menu"); }
+}
+$("breakExtend").onclick = () => { setClassTimer(5); restoreFromBreak(); };
+$("breakDone").onclick   = () => { restoreFromBreak(); };
+document.querySelectorAll(".ct-btns .diff-btn").forEach(b => { b.onclick = () => setClassTimer(+b.dataset.min); });
 // 留名儲存
 $("saveName").onclick = submitScore;
 $("nameInput").addEventListener("keydown", e => {
@@ -1679,12 +1748,14 @@ function render() {
 // =========================================================================
 let acc = 0, last = performance.now();
 const STEP = 1000 / 60;
+let _ctTick = 0;
 function loop(now) {
   acc += now - last; last = now;
   let guard = 0;
   while (acc >= STEP && guard < 5) { update(); acc -= STEP; guard++; }
   if (acc > 200) acc = 0;
   render();
+  if (classTimerEnd && ++_ctTick % 10 === 0) tickClassTimer();   // 每 ~6 幀更新一次下課計時
   requestAnimationFrame(loop);
 }
 
@@ -1746,6 +1817,8 @@ makePlayer();
 $("schoolBadge").src = makeBadgeDataURL();
 refreshLB("menuLeaderboard");
 updateAchCounts();
+document.querySelector('.ct-btns .diff-btn[data-min="0"]').classList.add("active");
+tickClassTimer();   // 若上次設的計時器還沒到，繼續顯示
 show("menu");
 requestAnimationFrame(loop);
 </script>
