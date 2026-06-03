@@ -1,0 +1,25 @@
+{
+  "name": "alien",
+  "version": "1.0.0",
+  "description": "> 桃園市龍潭區**石門國民小學**專屬的復古風太空射擊遊戲 —— 駕駛戰機，擊退一波波外星艦隊，守住石門上空！",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cagoooo/alien-invasion.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/cagoooo/alien-invasion/issues"
+  },
+  "homepage": "https://github.com/cagoooo/alien-invasion#readme",
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.0"
+  }
+}

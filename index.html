@@ -4,6 +4,15 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>外星人入侵 · 保衛石門 ｜ 石門國小</title>
+<meta name="description" content="石門國小專屬太空射擊遊戲 — 駕駛戰機，擊退一波波外星艦隊，守住石門上空！" />
+<meta name="theme-color" content="#05030f" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" type="image/png" href="./icon-192.png" />
+<link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="保衛石門" />
+<meta name="mobile-web-app-capable" content="yes" />
 <style>
   :root {
     --neon: #4af0ff;
@@ -1146,6 +1155,15 @@ $("schoolBadge").src = makeBadgeDataURL();
 renderLB("menuLeaderboard");
 show("menu");
 requestAnimationFrame(loop);
+</script>
+
+<!-- PWA：註冊 Service Worker（離線可玩、可加入主畫面） -->
+<script>
+if ("serviceWorker" in navigator) {
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(err => console.warn("SW 註冊失敗", err));
+  });
+}
 </script>
 </body>
 </html>
