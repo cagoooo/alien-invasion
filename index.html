@@ -491,6 +491,8 @@ function applyTheme(key) {
 // =========================================================================
 //  音效（Web Audio 合成，零外部檔案）
 // =========================================================================
+// 音效 / BGM 素材：Pixabay Content License（CC0 等價，商用免費、免標示）
+//   BGM「8-Bit space」by purrsahfef · 雷射 by ribhavagrawal · 爆炸/道具/升級/警報/結束 by freesound_community 等
 const Sound = (() => {
   let ctxA = null, muted = false;
   function ac() {
@@ -525,58 +527,69 @@ const Sound = (() => {
     src.connect(f).connect(g).connect(a.destination);
     src.start(t);
   }
-  // ---- BGM：程序合成 chiptune 迴圈（零外部檔案、可離線；復古太空主題）----
-  let bgmGain = null, bgmOn = false, bgmTimer = null, bgmNextT = 0, bgmBar = 0;
-  const HZ = { A2:110, F2:87.31, C3:130.81, G2:98, A3:220, B3:246.94, C4:261.63, D4:293.66, E4:329.63, F3:174.61, G3:196, G4:392 };
-  const BARS = [   // Am – F – C – G 經典上行進行
-    { bass: HZ.A2, arp: [HZ.A3, HZ.C4, HZ.E4, HZ.C4] },
-    { bass: HZ.F2, arp: [HZ.F3, HZ.A3, HZ.C4, HZ.A3] },
-    { bass: HZ.C3, arp: [HZ.C4, HZ.E4, HZ.G4, HZ.E4] },
-    { bass: HZ.G2, arp: [HZ.G3, HZ.B3, HZ.D4, HZ.B3] },
-  ];
-  const BAR_DUR = 1.55;
-  function bgmVoice(freq, t, dur, type, vol) {
-    const a = ac(); if (!a || !bgmGain) return;
-    const osc = a.createOscillator(), g = a.createGain();
-    osc.type = type; osc.frequency.value = freq;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.03);
-    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
-    osc.connect(g).connect(bgmGain);
-    osc.start(t); osc.stop(t + dur + 0.05);
-  }
-  function bgmSchedule() {
-    if (!bgmOn) return;
-    const a = ac();
-    if (a) while (bgmNextT < a.currentTime + 0.35) {
-      const bar = BARS[bgmBar % BARS.length], t0 = bgmNextT, sd = BAR_DUR / 4;
-      bgmVoice(bar.bass, t0, BAR_DUR * 0.92, "square", 0.05);          // 低音
-      bgmVoice(bar.bass * 2, t0 + sd * 2, sd, "square", 0.025);        // 八度點綴
-      bar.arp.forEach((f, i) => bgmVoice(f, t0 + i * sd, sd * 0.85, "triangle", 0.04));  // 琶音
-      bgmNextT += BAR_DUR; bgmBar++;
+  // ---- 真實 mp3 音效（Pixabay CC0）+ BGM ----
+  const AUDIO_BASE = "assets/audio/";
+  const SFX_FILES = { shoot: "shoot", explode: "explode", powerup: "powerup", hurt: "hurt", levelup: "levelup", boss: "boss", over: "over" };
+  const SFX_VOL = { shoot: 0.3, explode: 0.5, powerup: 0.55, hurt: 0.5, levelup: 0.55, boss: 0.6, over: 0.6 };
+  const POOL = 4;
+  const sfxPool = {};
+  let audioReady = false;
+  function preloadSfx() {
+    if (audioReady) return; audioReady = true;
+    for (const k in SFX_FILES) {
+      const a = new Audio(AUDIO_BASE + SFX_FILES[k] + ".mp3");
+      a.preload = "auto"; a.volume = SFX_VOL[k];
+      sfxPool[k] = [a];
     }
-    bgmTimer = setTimeout(bgmSchedule, 130);   // 用 setTimeout 而非 rAF（分頁隱藏時仍續排程）
+  }
+  function playSfx(k) {
+    if (muted) return;
+    let pool = sfxPool[k]; if (!pool) pool = sfxPool[k] = [];
+    let a = pool.find(x => x.paused || x.ended);
+    if (!a) {
+      if (pool.length < POOL) { a = new Audio(AUDIO_BASE + SFX_FILES[k] + ".mp3"); a.preload = "auto"; pool.push(a); }
+      else a = pool[0];
+    }
+    try { a.currentTime = 0; } catch (e) {}
+    a.volume = SFX_VOL[k] || 0.5;
+    a.play().catch(() => {});       // 未解鎖 / 未快取 → 靜默忽略
+  }
+  // BGM：真實 mp3 loop + 淡入淡出
+  let bgmAudio = null, bgmWanted = false, bgmFade = null;
+  function bgmEl() {
+    if (!bgmAudio) { bgmAudio = new Audio(AUDIO_BASE + "bgm.mp3"); bgmAudio.loop = true; bgmAudio.preload = "auto"; bgmAudio.volume = 0; }
+    return bgmAudio;
+  }
+  function fadeBgm(target, stopAtEnd) {
+    const el = bgmEl();
+    if (bgmFade) clearInterval(bgmFade);
+    const start = el.volume, steps = 16; let i = 0;
+    bgmFade = setInterval(() => {
+      i++; el.volume = Math.max(0, Math.min(0.6, start + (target - start) * (i / steps)));
+      if (i >= steps) { clearInterval(bgmFade); bgmFade = null; if (stopAtEnd && target === 0) { try { el.pause(); } catch (e) {} } }
+    }, 60);
   }
   return {
-    resume() { const a = ac(); if (a && a.state === "suspended") a.resume(); },
-    toggle() { muted = !muted; if (bgmGain) bgmGain.gain.value = muted ? 0 : 1; return muted; },
+    resume() { const a = ac(); if (a && a.state === "suspended") a.resume(); preloadSfx(); },
+    toggle() {
+      muted = !muted;
+      if (bgmAudio) { if (muted) { try { bgmAudio.pause(); } catch (e) {} } else if (bgmWanted) { bgmAudio.play().then(() => fadeBgm(0.3)).catch(() => {}); } }
+      return muted;
+    },
     isMuted() { return muted; },
     startBGM() {
-      const a = ac(); if (!a) return;
-      if (!bgmGain) { bgmGain = a.createGain(); bgmGain.connect(a.destination); }
-      bgmGain.gain.value = muted ? 0 : 1;
-      if (bgmOn) return;
-      bgmOn = true; bgmNextT = a.currentTime + 0.12; bgmSchedule();
+      bgmWanted = true; if (muted) return;
+      bgmEl().play().then(() => fadeBgm(0.3)).catch(() => {});
     },
-    stopBGM() { bgmOn = false; if (bgmTimer) { clearTimeout(bgmTimer); bgmTimer = null; } },
-    shoot()    { tone(880, 0.08, "square", 0.05, 1400); },
-    hit()      { tone(220, 0.06, "sawtooth", 0.10, 140); },
-    explode()  { noise(0.32, 0.30); tone(120, 0.3, "sawtooth", 0.10, 50); },
-    powerup()  { tone(523, 0.09, "triangle", 0.18); setTimeout(()=>tone(784,0.09,"triangle",0.18),90); setTimeout(()=>tone(1047,0.14,"triangle",0.18),180); },
-    hurt()     { noise(0.2, 0.3); tone(160, 0.25, "square", 0.18, 60); },
-    levelup()  { [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,0.14,"triangle",0.18),i*90)); },
-    boss()     { tone(70, 0.6, "sawtooth", 0.22, 45); },
-    over()     { [440,330,262,196].forEach((f,i)=>setTimeout(()=>tone(f,0.3,"sawtooth",0.18),i*160)); },
+    stopBGM() { bgmWanted = false; if (bgmAudio) fadeBgm(0, true); },
+    shoot()   { playSfx("shoot"); },
+    hit()     { tone(240, 0.05, "square", 0.04, 160); },   // 高頻細微 tick 保留合成（每發都響，用 mp3 太吵）
+    explode() { playSfx("explode"); },
+    powerup() { playSfx("powerup"); },
+    hurt()    { playSfx("hurt"); },
+    levelup() { playSfx("levelup"); },
+    boss()    { playSfx("boss"); },
+    over()    { playSfx("over"); },
   };
 })();
 
