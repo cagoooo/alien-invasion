@@ -188,6 +188,15 @@
   .ach-i-text { font-size: 13px; color: #eaf6ff; }
   .ach-i-text small { color: #8fa2c8; font-size: 11px; }
 
+  /* ---------- 設定 ---------- */
+  .set-list { width: min(340px, 88%); display: flex; flex-direction: column; gap: 8px; }
+  .set-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;
+    background: rgba(13,9,48,0.6); border: 1px solid #2a2658; border-radius: 12px; padding: 12px 14px;
+    text-align: left; font-size: 14px; color: #eaf6ff; }
+  .set-item small { color: #8fa2c8; font-size: 11px; }
+  .set-item input { width: 22px; height: 22px; accent-color: var(--neon-green); flex-shrink: 0; }
+  .ios-hint { font-size: 12px; color: #8fa2c8; max-width: 320px; line-height: 1.5; }
+
   /* ---------- 頁尾署名 ---------- */
   .site-credit {
     text-align: center; font-size: 12px;
@@ -216,18 +225,18 @@
     <div class="screen" id="menu">
       <img id="schoolBadge" class="school-badge" alt="石門國小校徽" />
       <h1 class="title">外星人入侵<span class="en">保衛石門 · DEFEND SHIH MEN</span></h1>
-      <p class="subtitle">
-        石門國小防衛隊，起飛迎戰外星艦隊 🛸<br>
-        <b>電腦</b> <kbd>←</kbd><kbd>→</kbd>/<kbd>A</kbd><kbd>D</kbd> 移動 · <b>手機</b> 滑動操控 · 自動開火
-      </p>
+      <p class="subtitle">石門國小防衛隊，起飛迎戰外星艦隊 🛸 <span class="hint-mobile">手機滑動 / 電腦方向鍵操控</span></p>
       <div class="diff-group">
         <span class="diff-label">模式</span>
         <button class="mode-btn active" data-mode="campaign">闖關</button>
         <button class="mode-btn" data-mode="endless">無盡</button>
-        <span class="diff-label" style="margin-left:6px">難度</span>
-        <button class="diff-btn" data-diff="easy">簡單</button>
-        <button class="diff-btn active" data-diff="normal">普通</button>
-        <button class="diff-btn" data-diff="hard">困難</button>
+        <button class="mode-btn" data-mode="daily">📅 每日</button>
+      </div>
+      <div class="diff-group">
+        <span class="diff-label">年級</span>
+        <button class="diff-btn" data-diff="easy">低年級</button>
+        <button class="diff-btn active" data-diff="normal">中年級</button>
+        <button class="diff-btn" data-diff="hard">高年級</button>
       </div>
       <button class="btn" id="startBtn">開始遊戲 ▶</button>
       <div class="leaderboard">
@@ -238,7 +247,19 @@
         </div>
         <div id="menuLeaderboard"></div>
       </div>
-      <p class="credit-small"><span class="ach-link" id="achBtn">🏅 成就 <b id="achMenuCount">0/10</b></span> · 桃園市龍潭區石門國民小學</p>
+      <p class="credit-small"><span class="ach-link" id="achBtn">🏅 成就 <b id="achMenuCount">0/10</b></span> · <span class="ach-link" id="setBtn">⚙️ 設定</span> · 石門國小</p>
+    </div>
+
+    <!-- 設定 -->
+    <div class="screen hidden" id="setScreen">
+      <h1 class="title" style="font-size:clamp(24px,6vw,40px)">⚙️ 設定</h1>
+      <div class="set-list">
+        <label class="set-item"><span>🌀 減少動態<br><small>關閉螢幕震動、減少粒子（暈動症友善）</small></span><input type="checkbox" id="setRM"></label>
+        <label class="set-item"><span>👁️ 色盲友善<br><small>敵方子彈加白色描邊，更好辨識</small></span><input type="checkbox" id="setCB"></label>
+      </div>
+      <button class="btn" id="installBtn" style="display:none">📲 加入主畫面（安裝 App）</button>
+      <p class="ios-hint" id="iosHint" style="display:none">iPhone / iPad：點瀏覽器「分享 ↗ → 加入主畫面」即可安裝</p>
+      <button class="btn secondary" id="setBack">返回 ◂</button>
     </div>
 
     <!-- 成就徽章 -->
@@ -325,6 +346,22 @@ const randi = (a, b) => Math.floor(rand(a, b + 1));
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const pick  = arr => arr[randi(0, arr.length - 1)];
 const aabb  = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+// ---------- 種子亂數（每日挑戰：全校今天玩同一套敵人序列）----------
+let _seed = 1;
+function seedRng(s) { _seed = (s >>> 0) || 1; }
+function srand() { _seed = (_seed * 1664525 + 1013904223) >>> 0; return _seed / 4294967296; }
+// 依模式取亂數：daily 用種子（可重現），其餘用 Math.random
+function gr() { return G.mode === "daily" ? srand() : Math.random(); }
+function grRange(a, b) { return a + gr() * (b - a); }
+function dailySeed() { const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+
+// ---------- 設定（色盲友善 / 減少動態）----------
+const SETTINGS = {
+  reducedMotion: localStorage.getItem("alienReducedMotion") === "1" ||
+    !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches),
+  colorblind: localStorage.getItem("alienColorblind") === "1",
+};
 
 // =========================================================================
 //  音效（Web Audio 合成，零外部檔案）
@@ -484,6 +521,22 @@ function drawSprite(rows, x, y, cell, color, glow) {
 }
 const spriteSize = (rows, cell) => ({ w: rows[0].length * cell, h: rows.length * cell });
 
+// 精靈預渲染快取：把每種敵人畫成離屏 canvas，渲染時 drawImage 一次取代逐格 fillRect
+const _spriteCache = {};
+function spriteCanvas(type, white) {
+  const k = type + (white ? "1" : "0");
+  if (_spriteCache[k]) return _spriteCache[k];
+  const rows = SPRITES[type], cell = ALIEN_TYPES[type].cell;
+  const cv = document.createElement("canvas");
+  cv.width = rows[0].length * cell; cv.height = rows.length * cell;
+  const x = cv.getContext("2d");
+  x.fillStyle = white ? "#ffffff" : ALIEN_TYPES[type].color;
+  for (let r = 0; r < rows.length; r++)
+    for (let c = 0; c < rows[r].length; c++)
+      if (rows[r][c] === "1") x.fillRect(c * cell, r * cell, cell, cell);
+  _spriteCache[k] = cv; return cv;
+}
+
 // =========================================================================
 //  外星人種類設定
 // =========================================================================
@@ -504,6 +557,8 @@ const DIFFICULTY = {
   hard:   { name: "困難", lives: 2, fire: 1.70, speed: 1.28, bspeed: 1.22, color: "#ff4ec7" },
 };
 const diff = () => DIFFICULTY[G.difficulty];
+const endlessLike = () => G.mode === "endless" || G.mode === "daily";   // 無盡 / 每日皆持續生成
+const modeName = () => G.mode === "daily" ? "每日挑戰" : G.mode === "endless" ? "無盡" : "闖關";
 
 // =========================================================================
 //  全域遊戲狀態
@@ -716,6 +771,8 @@ function alienShoot(a) {
 //  粒子 / 爆炸 / 飄字
 // =========================================================================
 function burst(x, y, color, n = 14, power = 4) {
+  if (SETTINGS.reducedMotion) n = Math.ceil(n / 3);     // 減少動態：少量粒子
+  if (particles.length > 360) return;                   // 上限，避免粒子爆量拖累效能
   for (let i = 0; i < n; i++) {
     const a = rand(0, Math.PI * 2), sp = rand(1, power);
     particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
@@ -765,9 +822,9 @@ const POWER_DEFS = {
   missile: { color: "#ff9b3c", label: "➤", name: "追蹤導彈" },
 };
 function maybeDropPower(x, y, chance) {
-  if (Math.random() > chance) return;
+  if (gr() > chance) return;
   let type;
-  const roll = Math.random();
+  const roll = gr();
   if (roll < 0.05) type = "life";
   else if (roll < 0.30) type = "spread";
   else if (roll < 0.52) type = "rapid";
@@ -896,7 +953,7 @@ canvas.addEventListener("touchmove",  e => { if (e.touches[0]) pointerMove(e.tou
 //  生命週期：開始 / 暫停 / 結束
 // =========================================================================
 const $ = id => document.getElementById(id);
-const SCREENS = ["menu","pause","levelup","gameover","achScreen"];
+const SCREENS = ["menu","pause","levelup","gameover","achScreen","setScreen"];
 function show(id) { SCREENS.forEach(s => $(s).classList.toggle("hidden", s !== id)); }
 function hideAll() { SCREENS.forEach(s => $(s).classList.add("hidden")); }
 
@@ -908,9 +965,10 @@ function startGame() {
   G.kills = 0; G.flawless = true;
   G.rapidTimer = 0; G.shieldTimer = 0;
   G.survivalFrames = 0; G.spawnCd = 36; G.bossClock = 60 * 50;
+  if (G.mode === "daily") seedRng(dailySeed());   // 每日挑戰：全校今天同一套敵人序列
   bullets = []; eBullets = []; particles = []; powerups = []; floaters = []; boss = null; aliens = [];
   makePlayer();
-  if (G.mode === "campaign") spawnWave(1);   // 無盡模式由 endlessUpdate 持續生成
+  if (G.mode === "campaign") spawnWave(1);   // 無盡 / 每日由 endlessUpdate 持續生成
   hideAll();
 }
 function togglePause() {
@@ -953,8 +1011,8 @@ function gameOver() {
   if (G.score > G.high) { G.high = G.score; localStorage.setItem("alienInvasionHigh", G.high); }
   $("finalScore").textContent = G.score.toLocaleString();
   $("finalHigh").textContent  = G.high.toLocaleString();
-  $("finalProgress").textContent = G.mode === "endless"
-    ? ("存活 " + Math.floor(G.survivalFrames / 60) + " 秒")
+  $("finalProgress").textContent = endlessLike()
+    ? (modeName() + " 存活 " + Math.floor(G.survivalFrames / 60) + " 秒")
     : ("抵達第 " + G.level + " 波");
   // 有分數就可上傳（本機 + 全校）
   $("nameInput").value = "";
@@ -1058,12 +1116,36 @@ async function submitScore() {
   saveLB(lb);
   G.scoreSaved = true;
   $("nameEntry").classList.add("hidden");
-  // 雲端（非同步，不阻塞）
-  if (window.Cloud && window.Cloud.ready) {
-    window.Cloud.submit(name, G.score, G.level, G.difficulty, cls).then(ok => { if (ok && lbScope !== "local") refreshLB("goLeaderboard"); });
+  // 雲端：分數合理性檢查（超上限就不上雲，仍存本機），離線則排隊補傳
+  const entry = { name, score: G.score, level: G.level, diff: G.difficulty, cls };
+  if (G.score <= plausibleMax() * 3) {
+    if (window.Cloud && window.Cloud.ready) {
+      window.Cloud.submit(name, G.score, G.level, G.difficulty, cls).then(ok => { if (!ok) queueScore(entry); else if (lbScope !== "local") refreshLB("goLeaderboard"); });
+    } else {
+      queueScore(entry);                       // 離線：排隊，連上線自動補傳
+    }
   }
   refreshLB("goLeaderboard"); refreshLB("menuLeaderboard");
 }
+// 合理分數上限估算（防洗榜的軟性檢查）
+function plausibleMax() {
+  return endlessLike()
+    ? Math.floor(G.survivalFrames / 60) * 3000 + G.kills * 400 + 8000
+    : G.level * 60000 + 60000;
+}
+// 離線分數佇列：連不上雲端時暫存，cloud-ready 後自動補傳
+function loadQueue() { try { return JSON.parse(localStorage.getItem("alienInvasionQueue") || "[]"); } catch (e) { return []; } }
+function saveQueue(q) { localStorage.setItem("alienInvasionQueue", JSON.stringify(q.slice(-20))); }
+function queueScore(e) { const q = loadQueue(); q.push(e); saveQueue(q); }
+async function flushQueue() {
+  if (!window.Cloud || !window.Cloud.ready) return;
+  const q = loadQueue(); if (!q.length) return;
+  const left = [];
+  for (const e of q) { const ok = await window.Cloud.submit(e.name, e.score, e.level, e.diff, e.cls); if (!ok) left.push(e); }
+  saveQueue(left);
+  if (left.length !== q.length) refreshLB(visibleLBId());
+}
+addEventListener("cloud-ready", flushQueue);
 
 // ---------- 成績卡分享 ----------
 function makeScoreCard() {
@@ -1084,9 +1166,10 @@ function makeScoreCard() {
   x.fillStyle = "#ff4ec7"; x.shadowColor = "#ff4ec7"; x.shadowBlur = 22; x.font = "900 92px 'Trebuchet MS', sans-serif";
   x.fillText(G.score.toLocaleString(), W2 / 2, 432); x.shadowBlur = 0;
   x.fillStyle = "#7f93bf"; x.font = "bold 16px sans-serif"; x.fillText("SCORE", W2 / 2, 462);
-  const modeLabel = G.mode === "endless" ? ("存活 " + Math.floor(G.survivalFrames / 60) + " 秒") : ("第 " + G.level + " 波");
+  const modeLabel = endlessLike() ? ("存活 " + Math.floor(G.survivalFrames / 60) + " 秒") : ("第 " + G.level + " 波");
+  const modeIcon = G.mode === "daily" ? "📅 每日" : G.mode === "endless" ? "♾️ 無盡" : "🎯 闖關";
   x.fillStyle = "#eaf6ff"; x.font = "bold 20px 'Microsoft JhengHei','Noto Sans TC',sans-serif";
-  x.fillText((G.mode === "endless" ? "♾️ 無盡" : "🎯 闖關") + " · " + diff().name + " · " + modeLabel, W2 / 2, 524);
+  x.fillText(modeIcon + " · " + diff().name + " · " + modeLabel, W2 / 2, 524);
   x.fillStyle = "#6dff8c"; x.font = "bold 19px 'Microsoft JhengHei','Noto Sans TC',sans-serif";
   x.fillText("👾 來石門防衛隊一起拚名次！", W2 / 2, 600);
   x.fillStyle = "#9ab0dd"; x.font = "15px sans-serif"; x.fillText("cagoooo.github.io/alien-invasion", W2 / 2, 632);
@@ -1159,6 +1242,33 @@ $("soundToggle").onclick = () => { setMute(Sound.toggle()); };
 // 成就面板
 $("achBtn").onclick  = () => { renderAchPanel(); show("achScreen"); };
 $("achBack").onclick = () => { show("menu"); };
+
+// ---------- 設定面板（減少動態 / 色盲 / 安裝）----------
+$("setBtn").onclick  = () => {
+  $("setRM").checked = SETTINGS.reducedMotion;
+  $("setCB").checked = SETTINGS.colorblind;
+  show("setScreen");
+};
+$("setBack").onclick = () => show("menu");
+$("setRM").onchange = e => { SETTINGS.reducedMotion = e.target.checked; localStorage.setItem("alienReducedMotion", e.target.checked ? "1" : "0"); };
+$("setCB").onchange = e => { SETTINGS.colorblind = e.target.checked; localStorage.setItem("alienColorblind", e.target.checked ? "1" : "0"); };
+
+// PWA 安裝提示
+let deferredPrompt = null;
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredPrompt = e; $("installBtn").style.display = ""; });
+addEventListener("appinstalled", () => { deferredPrompt = null; $("installBtn").style.display = "none"; });
+$("installBtn").onclick = async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  try { await deferredPrompt.userChoice; } catch (e) {}
+  deferredPrompt = null; $("installBtn").style.display = "none";
+};
+// iOS 無 beforeinstallprompt → 顯示手動安裝提示
+(() => {
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const standalone = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone;
+  if (isIOS && !standalone) $("iosHint").style.display = "";
+})();
 // 留名儲存
 $("saveName").onclick = submitScore;
 $("nameInput").addEventListener("keydown", e => {
@@ -1224,7 +1334,7 @@ function update() {
   }
 
   // ---- 外星艦隊移動 / 無盡模式持續生成 ----
-  if (G.mode === "endless") endlessUpdate();
+  if (endlessLike()) endlessUpdate();
   else if (aliens.length) updateFormation();
 
   // ---- Boss ----
@@ -1286,7 +1396,7 @@ function endlessUpdate() {
   }
 }
 function spawnDescender(tier) {
-  const r = Math.random();
+  const r = gr();
   let type;
   if (r < 0.42) type = "scout";
   else if (r < 0.66) type = "fighter";
@@ -1297,10 +1407,10 @@ function spawnDescender(tier) {
   const hp = def.hp + Math.floor(tier / 3);
   aliens.push({
     type, hp, maxHp: hp,
-    x: rand(10, W - 10 - sz.w), y: -sz.h - 8,
+    x: grRange(10, W - 10 - sz.w), y: -sz.h - 8,
     w: sz.w, h: sz.h, col: 0,
-    vy: rand(0.7, 1.3) * (0.9 + tier * 0.12) * diff().speed,
-    wob: rand(0, Math.PI * 2), flash: 0,
+    vy: grRange(0.7, 1.3) * (0.9 + tier * 0.12) * diff().speed,
+    wob: grRange(0, Math.PI * 2), flash: 0,
   });
 }
 
@@ -1433,8 +1543,11 @@ function addScore(base, x, y) {
 function drawAlien(a) {
   const def = ALIEN_TYPES[a.type];
   const yy = a.y + Math.sin(a.wob) * 2;
-  const color = a.flash > 0 ? "#ffffff" : def.color;
-  drawSprite(SPRITES[a.type], a.x, yy, def.cell, color, true);
+  const img = spriteCanvas(a.type, a.flash > 0);
+  ctx.save();
+  if (!SETTINGS.reducedMotion) { ctx.shadowColor = def.color; ctx.shadowBlur = 8; }
+  ctx.drawImage(img, a.x, yy);
+  ctx.restore();
   // 受損色條（bomber/fighter）
   if (a.maxHp > 1 && a.hp < a.maxHp) {
     ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(a.x, yy - 5, a.w, 3);
@@ -1489,10 +1602,10 @@ function drawHUD() {
   // 波數 / 存活時間 + 難度（置中）
   if (!boss) {
     ctx.textAlign = "center"; ctx.fillStyle = "#4af0ff"; ctx.font = "bold 13px sans-serif";
-    const label = G.mode === "endless" ? ("存活 " + Math.floor(G.survivalFrames / 60) + "s") : ("第 " + G.level + " 波");
+    const label = endlessLike() ? ("存活 " + Math.floor(G.survivalFrames / 60) + "s") : ("第 " + G.level + " 波");
     ctx.fillText(label, W / 2, 14);
     const d = diff(); ctx.fillStyle = d.color; ctx.font = "11px sans-serif";
-    ctx.fillText(d.name + (G.mode === "endless" ? " · 無盡" : ""), W / 2, 32);
+    ctx.fillText(d.name + (G.mode !== "campaign" ? " · " + modeName() : ""), W / 2, 32);
   }
 
   // 生命（左上，戰機圖示；避開右上角音效鈕）
@@ -1530,7 +1643,7 @@ function drawHUD() {
 function render() {
   ctx.clearRect(0, 0, W, H);
   ctx.save();
-  if (G.shake > 0.5) ctx.translate(rand(-G.shake, G.shake), rand(-G.shake, G.shake));
+  if (!SETTINGS.reducedMotion && G.shake > 0.5) ctx.translate(rand(-G.shake, G.shake), rand(-G.shake, G.shake));
 
   drawStars();
 
@@ -1539,7 +1652,10 @@ function render() {
     aliens.forEach(drawAlien);
     if (boss) drawBoss();
     bullets.forEach(b => drawBullet(b, b.kind === "laser" ? "#7df9ff" : b.kind === "missile" ? "#ff9b3c" : "#fff7a8"));
-    eBullets.forEach(b => drawBullet(b, b.type === "boss" ? "#ff2a6d" : "#ff7ad9"));
+    eBullets.forEach(b => {
+      if (SETTINGS.colorblind) { ctx.fillStyle = "#fff"; ctx.fillRect(b.x - 1.5, b.y - 1.5, b.w + 3, b.h + 3); }   // 色盲：敵彈白描邊
+      drawBullet(b, b.type === "boss" ? "#ff2a6d" : "#ff7ad9");
+    });
     drawParticles();
     if (player) drawShip(player);
     drawFloaters();
