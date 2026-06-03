@@ -129,6 +129,11 @@
   .lb-tab { cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 700; color: #8fa2c8;
     background: rgba(26,22,64,0.5); border: 1px solid #3a3470; border-radius: 999px; padding: 4px 11px; transition: all .15s; white-space: nowrap; }
   .lb-tab.active { color: #05030f; background: #ffd24a; border-color: #ffd24a; }
+  .lb-time { display: flex; gap: 4px; justify-content: center; margin-bottom: 5px; }
+  .lb-time.hidden { display: none; }
+  .lb-tpill { cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 700; color: #8fa2c8;
+    background: transparent; border: 1px solid #2a2658; border-radius: 999px; padding: 2px 10px; transition: all .15s; }
+  .lb-tpill.active { color: #05030f; background: #6dff8c; border-color: #6dff8c; }
   .lb-row { display: flex; align-items: center; gap: 8px; font-size: 14px;
     background: rgba(13,9,48,0.55); border-radius: 7px; padding: 5px 12px; }
   .lb-rank { width: 22px; text-align: center; }
@@ -265,7 +270,7 @@
       <div class="alien-deco" style="animation:none">💥</div>
       <h1 class="title" id="goTitle" style="font-size:clamp(26px,7vw,46px)">遊戲結束</h1>
       <p class="stat-line">本次得分 <span class="big" id="finalScore">0</span></p>
-      <p class="subtitle">最高分：<b id="finalHigh">0</b> · 抵達第 <b id="finalLevel">1</b> 波</p>
+      <p class="subtitle">最高分：<b id="finalHigh">0</b> · <span id="finalProgress">第 1 波</span></p>
       <div class="name-entry hidden" id="nameEntry">
         <span class="ne-title">🏆 留下名字 + 班級，登上全校排行榜！</span>
         <div class="name-row">
@@ -281,11 +286,17 @@
           <button class="lb-tab" data-scope="class">🏫 我們班</button>
           <button class="lb-tab" data-scope="local">📱 本機</button>
         </div>
+        <div class="lb-time" id="lbTimeRow">
+          <button class="lb-tpill active" data-time="all">全部</button>
+          <button class="lb-tpill" data-time="today">今日</button>
+          <button class="lb-tpill" data-time="week">本週</button>
+        </div>
         <div id="goLeaderboard"></div>
       </div>
       <div class="row">
-        <button class="btn" id="restartBtn">再戰一場 ↻</button>
-        <button class="btn secondary" id="menuBtn">回主選單</button>
+        <button class="btn" id="restartBtn" style="padding:11px 20px">再戰 ↻</button>
+        <button class="btn secondary" id="shareBtn" style="padding:11px 16px">📸 成績卡</button>
+        <button class="btn secondary" id="menuBtn" style="padding:11px 18px">主選單</button>
       </div>
     </div>
   </div>
@@ -508,7 +519,7 @@ const G = {
   weaponType: "blaster",    // blaster | laser | missile（後兩者限時）
   weaponTimer: 0,
   combo: 0, comboTimer: 0,
-  shake: 0,
+  shake: 0, submitting: false,
   hitstop: 0, flash: 0, flashColor: "#fff",   // 打擊感
   kills: 0, flawless: true,                    // 成就用
   rapidTimer: 0, shieldTimer: 0,
@@ -942,14 +953,17 @@ function gameOver() {
   if (G.score > G.high) { G.high = G.score; localStorage.setItem("alienInvasionHigh", G.high); }
   $("finalScore").textContent = G.score.toLocaleString();
   $("finalHigh").textContent  = G.high.toLocaleString();
-  $("finalLevel").textContent = G.level;
+  $("finalProgress").textContent = G.mode === "endless"
+    ? ("存活 " + Math.floor(G.survivalFrames / 60) + " 秒")
+    : ("抵達第 " + G.level + " 波");
   // 有分數就可上傳（本機 + 全校）
   $("nameInput").value = "";
   $("classInput").value = localStorage.getItem("alienInvasionClass") || "";
   showNeError("");
   $("nameEntry").classList.toggle("hidden", !(G.score > 0));
+  updateTimeRowVisibility();
   refreshLB("goLeaderboard");
-  G.scoreSaved = false;
+  G.scoreSaved = false; G.submitting = false;
   show("gameover");
   Sound.over();
 }
@@ -973,30 +987,38 @@ function lbRowsHtml(rows) {
 }
 function myClass() { return localStorage.getItem("alienInvasionClass") || ""; }
 function lbCount(elId) { return elId === "menuLeaderboard" ? 3 : 5; }   // 選單精簡、結算完整
+let lbTime = "all";   // all | today | week（僅結算頁可切）
+function timeSinceMs() {
+  if (lbTime === "today") { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
+  if (lbTime === "week") { return Date.now() - 7 * 24 * 3600 * 1000; }
+  return null;
+}
 
 function renderLB(elId) {                       // 📱 本機
   const el = $(elId); if (!el) return;
   const lb = loadLB().slice(0, lbCount(elId));
   el.innerHTML = lb.length ? lbRowsHtml(lb) : '<div class="lb-empty">尚無紀錄 — 當第一位英雄！</div>';
 }
-async function renderGlobalLB(elId) {           // 🌏 全校
+async function renderGlobalLB(elId) {           // 🌏 全校（可切今日 / 本週）
   const el = $(elId); if (!el) return;
   if (!window.Cloud || !window.Cloud.ready) { el.innerHTML = '<div class="lb-empty">🌏 雲端連線中…（離線時可看「本機」分頁）</div>'; return; }
   el.innerHTML = '<div class="lb-empty">載入全校排行榜…</div>';
-  const rows = await window.Cloud.top(lbCount(elId));
+  const since = timeSinceMs();
+  const rows = since ? await window.Cloud.topByTime(lbCount(elId), since) : await window.Cloud.top(lbCount(elId));
   if (!rows) { el.innerHTML = '<div class="lb-empty">暫時連不上雲端，請看「本機」分頁</div>'; return; }
-  el.innerHTML = rows.length ? lbRowsHtml(rows) : '<div class="lb-empty">全校還沒人上榜 — 當第一個英雄！</div>';
+  el.innerHTML = rows.length ? lbRowsHtml(rows) : '<div class="lb-empty">這個時段還沒人上榜 — 當第一個！</div>';
 }
-async function renderClassLB(elId) {            // 🏫 我們班
+async function renderClassLB(elId) {            // 🏫 我們班（可切今日 / 本週）
   const el = $(elId); if (!el) return;
   const cls = myClass();
   if (!cls) { el.innerHTML = '<div class="lb-empty">玩一場、上傳時填「班級」，就能看我們班排名 🏫</div>'; return; }
   if (!window.Cloud || !window.Cloud.ready) { el.innerHTML = '<div class="lb-empty">🌏 雲端連線中…</div>'; return; }
   el.innerHTML = '<div class="lb-empty">載入「' + escapeHtml(cls) + '」排名…</div>';
-  const all = await window.Cloud.top(60);
+  const since = timeSinceMs();
+  const all = since ? await window.Cloud.topByTime(80, since) : await window.Cloud.top(80);
   if (!all) { el.innerHTML = '<div class="lb-empty">暫時連不上雲端</div>'; return; }
   const rows = all.filter(r => (r.class || "") === cls).slice(0, lbCount(elId));
-  el.innerHTML = rows.length ? lbRowsHtml(rows) : '<div class="lb-empty">「' + escapeHtml(cls) + '」還沒人上榜 — 當班上第一個！</div>';
+  el.innerHTML = rows.length ? lbRowsHtml(rows) : '<div class="lb-empty">「' + escapeHtml(cls) + '」這個時段還沒人上榜！</div>';
 }
 
 // ---------- 分頁切換（全校 / 我們班 / 本機）----------
@@ -1013,13 +1035,21 @@ const BANNED = ["幹","操你","操妳","媽的","他媽","你媽","妳媽","靠
 function isCleanName(s) { const t = String(s).toLowerCase().replace(/\s+/g, ""); return !BANNED.some(w => t.includes(w)); }
 function showNeError(msg) { const e = $("neError"); if (e) { e.textContent = msg; e.style.display = msg ? "block" : "none"; } }
 
-function submitScore() {
-  if (G.scoreSaved) return;
+async function submitScore() {
+  if (G.scoreSaved || G.submitting) return;
   const raw = ($("nameInput").value || "").trim();
   if (!isCleanName(raw)) { showNeError("暱稱包含不適當文字，請換一個 🙏"); return; }
-  showNeError("");
   const name = (raw || "無名英雄").slice(0, 10);
   const cls = ($("classInput").value || "").trim().slice(0, 8);
+  // 暱稱防冒名（雲端就緒且有填名時）
+  if (window.Cloud && window.Cloud.ready && raw) {
+    G.submitting = true; showNeError("檢查暱稱中…");
+    let res;
+    try { res = await window.Cloud.claimNickname(name); } finally { G.submitting = false; }
+    if (G.scoreSaved) return;                 // 期間若已存過則略過
+    if (!res.ok) { showNeError(res.reason || "暱稱無法使用"); return; }
+  }
+  showNeError("");
   if (cls) localStorage.setItem("alienInvasionClass", cls);
   // 本機
   const lb = loadLB();
@@ -1035,11 +1065,54 @@ function submitScore() {
   refreshLB("goLeaderboard"); refreshLB("menuLeaderboard");
 }
 
+// ---------- 成績卡分享 ----------
+function makeScoreCard() {
+  const W2 = 600, H2 = 760;
+  const c = document.createElement("canvas"); c.width = W2; c.height = H2;
+  const x = c.getContext("2d");
+  const g = x.createLinearGradient(0, 0, 0, H2); g.addColorStop(0, "#0d0930"); g.addColorStop(1, "#05030f");
+  x.fillStyle = g; x.fillRect(0, 0, W2, H2);
+  for (let i = 0; i < 90; i++) { x.fillStyle = "rgba(255,255,255," + (Math.random() * 0.5) + ")"; x.fillRect(Math.random() * W2, Math.random() * H2, 2, 2); }
+  x.textAlign = "center";
+  const bImg = $("schoolBadge");
+  if (bImg && bImg.complete && bImg.naturalWidth) { const bs = 140; x.drawImage(bImg, W2 / 2 - bs / 2, 38, bs, bs); }
+  x.fillStyle = "#fff"; x.font = "900 42px 'Trebuchet MS', sans-serif";
+  x.shadowColor = "#4af0ff"; x.shadowBlur = 18; x.fillText("外星人入侵", W2 / 2, 222); x.shadowBlur = 0;
+  x.fillStyle = "#4af0ff"; x.font = "bold 17px sans-serif"; x.fillText("保衛石門 · DEFEND SHIH MEN", W2 / 2, 250);
+  const nm = (($("nameInput").value || "").trim() || "無名英雄").slice(0, 10);
+  x.fillStyle = "#ffd24a"; x.font = "bold 26px 'Microsoft JhengHei','Noto Sans TC',sans-serif"; x.fillText(nm + " 的戰績", W2 / 2, 322);
+  x.fillStyle = "#ff4ec7"; x.shadowColor = "#ff4ec7"; x.shadowBlur = 22; x.font = "900 92px 'Trebuchet MS', sans-serif";
+  x.fillText(G.score.toLocaleString(), W2 / 2, 432); x.shadowBlur = 0;
+  x.fillStyle = "#7f93bf"; x.font = "bold 16px sans-serif"; x.fillText("SCORE", W2 / 2, 462);
+  const modeLabel = G.mode === "endless" ? ("存活 " + Math.floor(G.survivalFrames / 60) + " 秒") : ("第 " + G.level + " 波");
+  x.fillStyle = "#eaf6ff"; x.font = "bold 20px 'Microsoft JhengHei','Noto Sans TC',sans-serif";
+  x.fillText((G.mode === "endless" ? "♾️ 無盡" : "🎯 闖關") + " · " + diff().name + " · " + modeLabel, W2 / 2, 524);
+  x.fillStyle = "#6dff8c"; x.font = "bold 19px 'Microsoft JhengHei','Noto Sans TC',sans-serif";
+  x.fillText("👾 來石門防衛隊一起拚名次！", W2 / 2, 600);
+  x.fillStyle = "#9ab0dd"; x.font = "15px sans-serif"; x.fillText("cagoooo.github.io/alien-invasion", W2 / 2, 632);
+  x.fillStyle = "#6f7fa6"; x.font = "13px 'Microsoft JhengHei','Noto Sans TC',sans-serif";
+  x.fillText("桃園市龍潭區石門國民小學 · Made with ♥ by 阿凱老師", W2 / 2, 722);
+  return c.toDataURL("image/png");
+}
+async function shareScoreCard() {
+  const url = makeScoreCard();
+  try {
+    const blob = await (await fetch(url)).blob();
+    const file = new File([blob], "alien-score.png", { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: "外星人入侵·保衛石門", text: "我在「外星人入侵·保衛石門」拿到 " + G.score.toLocaleString() + " 分！" });
+      return;
+    }
+  } catch (e) { /* 取消分享或不支援 → 退回下載 */ }
+  const a = document.createElement("a"); a.href = url; a.download = "外星人入侵成績卡.png"; a.click();
+}
+
 $("startBtn").onclick   = startGame;
 $("resumeBtn").onclick  = togglePause;
 $("quitBtn").onclick    = () => { Sound.stopBGM(); G.state = "menu"; refreshLB("menuLeaderboard"); show("menu"); };
 $("restartBtn").onclick = startGame;
 $("menuBtn").onclick    = () => { Sound.stopBGM(); G.state = "menu"; refreshLB("menuLeaderboard"); show("menu"); };
+$("shareBtn").onclick   = shareScoreCard;
 
 // 模式選擇（闖關 / 無盡）
 document.querySelectorAll(".mode-btn").forEach(b => {
@@ -1050,11 +1123,23 @@ document.querySelectorAll(".mode-btn").forEach(b => {
   };
 });
 
-// 排行榜分頁（全校 / 本機）
+// 排行榜分頁（全校 / 我們班 / 本機）
+function updateTimeRowVisibility() {
+  const row = $("lbTimeRow"); if (row) row.classList.toggle("hidden", lbScope === "local");
+}
 document.querySelectorAll(".lb-tab").forEach(b => {
   b.onclick = () => {
     lbScope = b.dataset.scope;
     document.querySelectorAll(".lb-tab").forEach(t => t.classList.toggle("active", t.dataset.scope === lbScope));
+    updateTimeRowVisibility();
+    refreshLB(visibleLBId());
+  };
+});
+// 時段切換（全部 / 今日 / 本週）
+document.querySelectorAll(".lb-tpill").forEach(b => {
+  b.onclick = () => {
+    lbTime = b.dataset.time;
+    document.querySelectorAll(".lb-tpill").forEach(t => t.classList.toggle("active", t.dataset.time === lbTime));
     refreshLB(visibleLBId());
   };
 });
@@ -1554,7 +1639,7 @@ requestAnimationFrame(loop);
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, serverTimestamp }
+  import { getFirestore, collection, doc, addDoc, getDoc, setDoc, query, where, orderBy, limit, getDocs, serverTimestamp, Timestamp }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const cfg = {
@@ -1598,6 +1683,32 @@ requestAnimationFrame(loop);
         const snap = await getDocs(query(collection(db, COLL), orderBy("score", "desc"), limit(n)));
         return snap.docs.map(d => d.data());
       } catch (e) { console.warn("讀取全校排行榜失敗", e); return null; }
+    },
+    // 限時段排行榜（今日 / 本週）：抓近期紀錄後依分數排序取前 n
+    async topByTime(n, sinceMs) {
+      if (!db) return null;
+      try {
+        const snap = await getDocs(query(collection(db, COLL),
+          where("createdAt", ">=", Timestamp.fromMillis(sinceMs)), orderBy("createdAt", "desc"), limit(200)));
+        const rows = snap.docs.map(d => d.data());
+        rows.sort((a, b) => (b.score || 0) - (a.score || 0));
+        return rows.slice(0, n);
+      } catch (e) { console.warn("讀取限時排行榜失敗", e); return null; }
+    },
+    // 暱稱防冒名：第一個 uid 占有該暱稱；他人想用同名 → 拒絕
+    async claimNickname(name) {
+      if (!db || !uid) return { ok: true };   // 雲端離線時不擋
+      try {
+        const key = String(name).trim().toLowerCase().slice(0, 24);
+        if (!key) return { ok: true };
+        const ref = doc(db, "alienNicknames", key);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          return snap.data().uid === uid ? { ok: true } : { ok: false, reason: "暱稱已被占用，換一個吧" };
+        }
+        await setDoc(ref, { uid, createdAt: serverTimestamp() });
+        return { ok: true };
+      } catch (e) { console.warn("暱稱占有檢查失敗", e); return { ok: true }; }  // 失敗不擋上傳
     },
   };
   dispatchEvent(new Event("cloud-ready"));
