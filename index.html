@@ -197,7 +197,9 @@
   .set-item small { color: #8fa2c8; font-size: 11px; }
   .set-item input { width: 22px; height: 22px; accent-color: var(--neon-green); flex-shrink: 0; }
   .ios-hint { font-size: 12px; color: #8fa2c8; max-width: 320px; line-height: 1.5; }
-  .ct-btns { display: flex; gap: 6px; justify-content: center; }
+  .ct-btns { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+  .quiz-subjects { display: flex; flex-direction: column; gap: 10px; width: min(300px, 84%); }
+  .quiz-subjects .btn { width: 100%; }
   .class-timer {
     position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 6;
     font-family: 'Trebuchet MS', monospace; font-weight: 800; font-size: 14px;
@@ -243,6 +245,7 @@
         <button class="mode-btn active" data-mode="campaign">闖關</button>
         <button class="mode-btn" data-mode="endless">無盡</button>
         <button class="mode-btn" data-mode="daily">📅 每日</button>
+        <button class="mode-btn" data-mode="quiz">🎯 答題</button>
       </div>
       <div class="diff-group">
         <span class="diff-label">年級</span>
@@ -290,6 +293,19 @@
       <button class="btn" id="installBtn" style="display:none">📲 加入主畫面（安裝 App）</button>
       <p class="ios-hint" id="iosHint" style="display:none">iPhone / iPad：點瀏覽器「分享 ↗ → 加入主畫面」即可安裝</p>
       <button class="btn secondary" id="setBack">返回 ◂</button>
+    </div>
+
+    <!-- 答題射擊：科目選擇 -->
+    <div class="screen hidden" id="quizSetup">
+      <div class="alien-deco" style="animation:none">🎯</div>
+      <h1 class="title" style="font-size:clamp(24px,6vw,42px)">答題射擊</h1>
+      <p class="subtitle">用火力打中<b>正確答案</b>的外星人！<br>答錯或漏掉正解會扣一台戰機，選個科目開始：</p>
+      <div class="quiz-subjects">
+        <button class="btn quiz-sub" data-subject="math">➕ 數學（依年級出題）</button>
+        <button class="btn quiz-sub" data-subject="en">🔤 英文單字</button>
+        <button class="btn quiz-sub" data-subject="sci">🔬 自然常識</button>
+      </div>
+      <button class="btn secondary" id="quizBack">返回 ◂</button>
     </div>
 
     <!-- 下課時間到 -->
@@ -616,7 +632,8 @@ const DIFFICULTY = {
 };
 const diff = () => DIFFICULTY[G.difficulty];
 const endlessLike = () => G.mode === "endless" || G.mode === "daily";   // 無盡 / 每日皆持續生成
-const modeName = () => G.mode === "daily" ? "每日挑戰" : G.mode === "endless" ? "無盡" : "闖關";
+const modeName = () => G.mode === "daily" ? "每日挑戰" : G.mode === "endless" ? "無盡" : G.mode === "quiz" ? "答題" : "闖關";
+const QUIZ_SUBJ = { math: "數學", en: "英文", sci: "自然" };
 
 // =========================================================================
 //  全域遊戲狀態
@@ -625,7 +642,8 @@ const G = {
   state: "menu",            // menu | playing | paused | levelup | gameover
   score: 0, level: 1, lives: 3,
   difficulty: "normal",     // easy | normal | hard
-  mode: "campaign",         // campaign 闖關 | endless 無盡
+  mode: "campaign",         // campaign 闖關 | endless 無盡 | daily 每日 | quiz 答題
+  quizSubject: "math", question: null, qIndex: 0, quizCorrect: 0,
   survivalFrames: 0, spawnCd: 0, bossClock: 0,   // 無盡模式用
   high: +(localStorage.getItem("alienInvasionHigh") || 0),
   weapon: 1,                // 1~3 火力等級
@@ -981,7 +999,7 @@ addEventListener("keydown", e => {
   if (e.key === "p" || e.key === "P") togglePause();
   if (e.key === "m" || e.key === "M") setMute(Sound.toggle());
   if (e.key === "Enter") {
-    if (G.state === "menu") startGame();
+    if (G.state === "menu") startOrSetup();
     else if (G.state === "gameover") startGame();
   }
 });
@@ -1011,7 +1029,7 @@ canvas.addEventListener("touchmove",  e => { if (e.touches[0]) pointerMove(e.tou
 //  生命週期：開始 / 暫停 / 結束
 // =========================================================================
 const $ = id => document.getElementById(id);
-const SCREENS = ["menu","pause","levelup","gameover","achScreen","setScreen","breakScreen"];
+const SCREENS = ["menu","pause","levelup","gameover","achScreen","setScreen","breakScreen","quizSetup"];
 function show(id) { SCREENS.forEach(s => $(s).classList.toggle("hidden", s !== id)); }
 function hideAll() { SCREENS.forEach(s => $(s).classList.add("hidden")); }
 
@@ -1023,12 +1041,15 @@ function startGame() {
   G.kills = 0; G.flawless = true;
   G.rapidTimer = 0; G.shieldTimer = 0;
   G.survivalFrames = 0; G.spawnCd = 36; G.bossClock = 60 * 50;
+  G.qIndex = 0; G.quizCorrect = 0; G.question = null;
   if (G.mode === "daily") seedRng(dailySeed());   // 每日挑戰：全校今天同一套敵人序列
   bullets = []; eBullets = []; particles = []; powerups = []; floaters = []; boss = null; aliens = [];
   makePlayer();
-  if (G.mode === "campaign") spawnWave(1);   // 無盡 / 每日由 endlessUpdate 持續生成
+  if (G.mode === "campaign") spawnWave(1);        // 無盡 / 每日由 endlessUpdate 持續生成
+  else if (G.mode === "quiz") spawnQuestion();    // 答題：出第一題
   hideAll();
 }
+function startOrSetup() { if (G.mode === "quiz") show("quizSetup"); else startGame(); }
 function togglePause() {
   if (G.state === "playing") { G.state = "paused"; Sound.stopBGM(); show("pause"); }
   else if (G.state === "paused") { G.state = "playing"; Sound.startBGM(); hideAll(); }
@@ -1069,7 +1090,9 @@ function gameOver() {
   if (G.score > G.high) { G.high = G.score; localStorage.setItem("alienInvasionHigh", G.high); }
   $("finalScore").textContent = G.score.toLocaleString();
   $("finalHigh").textContent  = G.high.toLocaleString();
-  $("finalProgress").textContent = endlessLike()
+  $("finalProgress").textContent = G.mode === "quiz"
+    ? ("答對 " + G.quizCorrect + " 題（" + (QUIZ_SUBJ[G.quizSubject] || "") + "）")
+    : endlessLike()
     ? (modeName() + " 存活 " + Math.floor(G.survivalFrames / 60) + " 秒")
     : ("抵達第 " + G.level + " 波");
   // 有分數就可上傳（本機 + 全校）
@@ -1187,6 +1210,7 @@ async function submitScore() {
 }
 // 合理分數上限估算（防洗榜的軟性檢查）
 function plausibleMax() {
+  if (G.mode === "quiz") return G.quizCorrect * 2500 + 10000;
   return endlessLike()
     ? Math.floor(G.survivalFrames / 60) * 3000 + G.kills * 400 + 8000
     : G.level * 60000 + 60000;
@@ -1224,8 +1248,8 @@ function makeScoreCard() {
   x.fillStyle = "#ff4ec7"; x.shadowColor = "#ff4ec7"; x.shadowBlur = 22; x.font = "900 92px 'Trebuchet MS', sans-serif";
   x.fillText(G.score.toLocaleString(), W2 / 2, 432); x.shadowBlur = 0;
   x.fillStyle = "#7f93bf"; x.font = "bold 16px sans-serif"; x.fillText("SCORE", W2 / 2, 462);
-  const modeLabel = endlessLike() ? ("存活 " + Math.floor(G.survivalFrames / 60) + " 秒") : ("第 " + G.level + " 波");
-  const modeIcon = G.mode === "daily" ? "📅 每日" : G.mode === "endless" ? "♾️ 無盡" : "🎯 闖關";
+  const modeLabel = G.mode === "quiz" ? ("答對 " + G.quizCorrect + " 題") : endlessLike() ? ("存活 " + Math.floor(G.survivalFrames / 60) + " 秒") : ("第 " + G.level + " 波");
+  const modeIcon = G.mode === "quiz" ? ("🎯 答題·" + (QUIZ_SUBJ[G.quizSubject] || "")) : G.mode === "daily" ? "📅 每日" : G.mode === "endless" ? "♾️ 無盡" : "🚀 闖關";
   x.fillStyle = "#eaf6ff"; x.font = "bold 20px 'Microsoft JhengHei','Noto Sans TC',sans-serif";
   x.fillText(modeIcon + " · " + diff().name + " · " + modeLabel, W2 / 2, 524);
   x.fillStyle = "#6dff8c"; x.font = "bold 19px 'Microsoft JhengHei','Noto Sans TC',sans-serif";
@@ -1248,12 +1272,15 @@ async function shareScoreCard() {
   const a = document.createElement("a"); a.href = url; a.download = "外星人入侵成績卡.png"; a.click();
 }
 
-$("startBtn").onclick   = startGame;
+$("startBtn").onclick   = startOrSetup;
 $("resumeBtn").onclick  = togglePause;
 $("quitBtn").onclick    = () => { Sound.stopBGM(); G.state = "menu"; refreshLB("menuLeaderboard"); show("menu"); };
 $("restartBtn").onclick = startGame;
 $("menuBtn").onclick    = () => { Sound.stopBGM(); G.state = "menu"; refreshLB("menuLeaderboard"); show("menu"); };
 $("shareBtn").onclick   = shareScoreCard;
+// 答題科目選擇
+$("quizBack").onclick   = () => show("menu");
+document.querySelectorAll(".quiz-sub").forEach(b => { b.onclick = () => { G.quizSubject = b.dataset.subject; startGame(); }; });
 
 // 模式選擇（闖關 / 無盡）
 document.querySelectorAll(".mode-btn").forEach(b => {
@@ -1420,10 +1447,11 @@ function update() {
     b.x += b.vx; b.y += b.vy;
     if (b.y < -24 || b.x < -24 || b.x > W + 24) { bullets.splice(i, 1); continue; }
     let consumed = false;
-    // 打小兵
+    // 打小兵 / 答題目標
     for (let j = aliens.length - 1; j >= 0; j--) {
       const a = aliens[j];
       if (aabb(b, a)) {
+        if (a.type === "quiz") { answerTarget(a); consumed = true; break; }   // 答題：命中即判定
         a.hp -= b.dmg; a.flash = 6; Sound.hit();
         if (a.hp <= 0) { killAlien(a); aliens.splice(j, 1); }
         if (!b.pierce) { consumed = true; break; }   // 一般彈：命中即消；雷射穿透續飛
@@ -1439,8 +1467,9 @@ function update() {
     if (consumed) bullets.splice(i, 1);
   }
 
-  // ---- 外星艦隊移動 / 無盡模式持續生成 ----
-  if (endlessLike()) endlessUpdate();
+  // ---- 移動：答題 / 無盡 / 闖關陣型 ----
+  if (G.mode === "quiz") quizUpdate();
+  else if (endlessLike()) endlessUpdate();
   else if (aliens.length) updateFormation();
 
   // ---- Boss ----
@@ -1518,6 +1547,104 @@ function spawnDescender(tier) {
     vy: grRange(0.7, 1.3) * (0.9 + tier * 0.12) * diff().speed,
     wob: grRange(0, Math.PI * 2), flash: 0,
   });
+}
+
+// =========================================================================
+//  🎯 答題射擊模式：打中正確答案的外星人
+// =========================================================================
+function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = randi(0, i); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+const EN_WORDS = [["貓","cat"],["狗","dog"],["書","book"],["水","water"],["紅色","red"],["藍色","blue"],["蘋果","apple"],["魚","fish"],["鳥","bird"],["手","hand"],["太陽","sun"],["月亮","moon"],["雨","rain"],["樹","tree"],["花","flower"],["車子","car"],["門","door"],["筆","pen"],["牛奶","milk"],["快樂","happy"],["老師","teacher"],["學校","school"],["朋友","friend"],["蛋","egg"]];
+const SCI_BANK = [
+  { q: "水結冰會變成什麼？", options: ["冰", "水蒸氣", "雲", "煙"], answer: "冰" },
+  { q: "植物行光合作用需要？", options: ["陽光", "黑暗", "聲音", "電"], answer: "陽光" },
+  { q: "下列哪個是哺乳類？", options: ["鯨魚", "鯊魚", "金魚", "青蛙"], answer: "鯨魚" },
+  { q: "彩虹通常有幾種顏色？", options: ["七種", "三種", "五種", "十種"], answer: "七種" },
+  { q: "蝴蝶的幼蟲叫什麼？", options: ["毛毛蟲", "蝌蚪", "蛹", "幼鳥"], answer: "毛毛蟲" },
+  { q: "人體運送氧氣的是？", options: ["血液", "骨頭", "皮膚", "頭髮"], answer: "血液" },
+  { q: "地球繞著什麼轉？", options: ["太陽", "月亮", "火星", "北極星"], answer: "太陽" },
+  { q: "磁鐵會吸引下列哪個？", options: ["鐵釘", "塑膠", "木頭", "玻璃"], answer: "鐵釘" },
+  { q: "下雨前天空常出現？", options: ["烏雲", "彩虹", "星星", "太陽"], answer: "烏雲" },
+  { q: "蜜蜂採集什麼做蜂蜜？", options: ["花蜜", "樹葉", "泥土", "雨水"], answer: "花蜜" },
+  { q: "聲音是靠什麼傳播？", options: ["空氣", "光線", "影子", "顏色"], answer: "空氣" },
+  { q: "種子發芽最需要？", options: ["水分", "玩具", "音樂", "糖果"], answer: "水分" },
+];
+function makeMath() {
+  let a, b, op, ans;
+  if (G.difficulty === "easy") { op = pick(["+", "-"]); a = randi(1, 20); b = randi(1, 20); if (op === "-" && b > a) [a, b] = [b, a]; ans = op === "+" ? a + b : a - b; }
+  else if (G.difficulty === "normal") { op = pick(["+", "-", "×"]); if (op === "×") { a = randi(2, 9); b = randi(2, 9); ans = a * b; } else { a = randi(10, 99); b = randi(10, 99); if (op === "-" && b > a) [a, b] = [b, a]; ans = op === "+" ? a + b : a - b; } }
+  else { op = pick(["+", "-", "×", "÷"]); if (op === "×") { a = randi(3, 12); b = randi(3, 12); ans = a * b; } else if (op === "÷") { b = randi(2, 9); ans = randi(2, 9); a = b * ans; } else { a = randi(20, 200); b = randi(20, 200); if (op === "-" && b > a) [a, b] = [b, a]; ans = op === "+" ? a + b : a - b; } }
+  const correct = String(ans), opts = new Set([correct]);
+  let guard = 0; while (opts.size < 4 && guard++ < 50) { const d = ans + randi(-9, 9); if (d >= 0 && d !== ans) opts.add(String(d)); }
+  return { q: a + " " + op + " " + b + " = ?", options: shuffle([...opts]), answer: correct };
+}
+function makeEN() {
+  const [zh, en] = pick(EN_WORDS), opts = new Set([en]);
+  let guard = 0; while (opts.size < 4 && guard++ < 50) opts.add(pick(EN_WORDS)[1]);
+  return { q: "「" + zh + "」的英文是？", options: shuffle([...opts]), answer: en };
+}
+function makeSCI() { const it = pick(SCI_BANK); return { q: it.q, options: shuffle([...it.options]), answer: it.answer }; }
+function makeQuestion() { return G.quizSubject === "en" ? makeEN() : G.quizSubject === "sci" ? makeSCI() : makeMath(); }
+
+function spawnQuestion() {
+  aliens.length = 0;
+  const q = makeQuestion(); G.question = q;
+  const n = q.options.length, tw = 124, th = 50, gap = (W - n * tw) / (n + 1);
+  q.options.forEach((opt, i) => {
+    aliens.push({ type: "quiz", answer: opt, correct: opt === q.answer,
+      x: gap + i * (tw + gap), y: 130 + (i % 2) * 10, w: tw, h: th,
+      vy: 0.42 * diff().speed, wob: rand(0, 6.28), flash: 0 });
+  });
+}
+function nextQuestion() { G.qIndex++; spawnQuestion(); }
+function answerTarget(a) {
+  if (a.correct) {
+    addScore(150, a.x + a.w / 2, a.y);
+    burst(a.x + a.w / 2, a.y + a.h / 2, "#6dff8c", 22, 6); Sound.powerup();
+    floatText(W / 2, 100, "✓ 答對！", "#6dff8c");
+    G.quizCorrect++; hitstop(2);
+    nextQuestion();
+  } else {
+    burst(a.x + a.w / 2, a.y + a.h / 2, "#ff4ec7", 16, 5);
+    floatText(a.x + a.w / 2, a.y - 8, "✗", "#ff4ec7");
+    G.combo = 0;
+    const idx = aliens.indexOf(a); if (idx >= 0) aliens.splice(idx, 1);
+    loseLife();                       // 答錯扣一台戰機
+  }
+}
+function quizUpdate() {
+  for (let i = aliens.length - 1; i >= 0; i--) {
+    const a = aliens[i];
+    a.y += a.vy; a.wob += 0.03; if (a.flash > 0) a.flash--;
+    if (a.y > H + 4) {
+      aliens.splice(i, 1);
+      if (a.correct) { floatText(W / 2, 100, "✗ 漏掉正解！", "#ff7ad9"); loseLife(); nextQuestion(); }   // 正解漏掉 → 失誤
+    }
+  }
+}
+function drawQuizTarget(a) {
+  ctx.save();
+  ctx.fillStyle = a.flash > 0 ? "rgba(255,255,255,0.95)" : "rgba(20,28,66,0.94)";
+  ctx.strokeStyle = TH.neon; ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(a.x, a.y, a.w, a.h, 11); else ctx.rect(a.x, a.y, a.w, a.h);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = a.flash > 0 ? "#1a1a1a" : "#fff";
+  ctx.font = "bold 21px 'Microsoft JhengHei','Noto Sans TC',sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(String(a.answer).slice(0, 12), a.x + a.w / 2, a.y + a.h / 2 + 1);
+  ctx.restore();
+}
+function drawQuizQuestion() {
+  if (!G.question) return;
+  ctx.save();
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(13,9,48,0.85)";
+  const bw = W - 80, bx = 40, by = 64, bh = 44;
+  ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 12); else ctx.rect(bx, by, bw, bh);
+  ctx.fill(); ctx.strokeStyle = TH.neon; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = "#fff"; ctx.font = "bold 24px 'Microsoft JhengHei','Noto Sans TC',sans-serif";
+  ctx.fillText(G.question.q, W / 2, by + bh / 2 + 1);
+  ctx.restore();
 }
 
 function updateFormation() {
@@ -1647,6 +1774,7 @@ function addScore(base, x, y) {
 //  繪製
 // =========================================================================
 function drawAlien(a) {
+  if (a.type === "quiz") { drawQuizTarget(a); return; }
   const def = ALIEN_TYPES[a.type];
   const yy = a.y + Math.sin(a.wob) * 2;
   const img = spriteCanvas(a.type, a.flash > 0);
@@ -1708,10 +1836,11 @@ function drawHUD() {
   // 波數 / 存活時間 + 難度（置中）
   if (!boss) {
     ctx.textAlign = "center"; ctx.fillStyle = "#4af0ff"; ctx.font = "bold 13px sans-serif";
-    const label = endlessLike() ? ("存活 " + Math.floor(G.survivalFrames / 60) + "s") : ("第 " + G.level + " 波");
+    const label = G.mode === "quiz" ? ("答對 " + G.quizCorrect + " 題") : endlessLike() ? ("存活 " + Math.floor(G.survivalFrames / 60) + "s") : ("第 " + G.level + " 波");
     ctx.fillText(label, W / 2, 14);
     const d = diff(); ctx.fillStyle = d.color; ctx.font = "11px sans-serif";
-    ctx.fillText(d.name + (G.mode !== "campaign" ? " · " + modeName() : ""), W / 2, 32);
+    const sub = G.mode === "quiz" ? (" · " + (QUIZ_SUBJ[G.quizSubject] || "")) : (G.mode !== "campaign" ? " · " + modeName() : "");
+    ctx.fillText(d.name + sub, W / 2, 32);
   }
 
   // 生命（左上，戰機圖示；避開右上角音效鈕）
@@ -1756,6 +1885,7 @@ function render() {
   if (G.state !== "menu") {
     powerups.forEach(drawPowerup);
     aliens.forEach(drawAlien);
+    if (G.mode === "quiz") drawQuizQuestion();
     if (boss) drawBoss();
     bullets.forEach(b => drawBullet(b, b.kind === "laser" ? "#7df9ff" : b.kind === "missile" ? "#ff9b3c" : TH.pbullet));
     eBullets.forEach(b => {
