@@ -2,6 +2,8 @@
 
 > 桃園市龍潭區**石門國民小學**專屬的復古風太空射擊遊戲 —— 駕駛戰機，擊退一波波外星艦隊，守住石門上空！
 
+🌐 **線上使用：[外星人入侵·保衛石門 — 復古太空射擊 × 全校排行榜](https://cagoooo.github.io/alien-invasion/)**
+
 純 **HTML5 Canvas + 原生 JavaScript** 打造，**單一檔案、零相依、零建置**。任何瀏覽器打開即玩，電腦與手機都支援。
 
 ## 🎮 怎麼玩
@@ -45,7 +47,7 @@ Made with ❤️ by [阿凱老師](https://www.smes.tyc.edu.tw/modules/tadnews/p
 - Repository：`cagoooo/alien-invasion`
 - 可見性：公開
 - 主要技術：HTML
-- 線上入口：未在 GitHub repository metadata 設定
+- 線上入口：<https://cagoooo.github.io/alien-invasion/>
 
 ### 可以怎麼應用
 
