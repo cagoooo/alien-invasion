@@ -33,6 +33,7 @@
 | **P20 真實音效 + BGM** | 🎵 Pixabay CC0：8 個 mp3（雷射/爆炸/道具/受傷/升級/Boss/結束 + 8-bit space BGM）取代程序合成，HTML5 Audio pool + BGM 淡入淡出，納入 SW 快取（離線仍有聲） | ✅ |
 | **P20.1 加音效** | 🪙 連擊音（每 5 連擊）+ 🖱️ UI 點擊聲（全站 button 委派）+ 🌬️ 過場 whoosh + 🛡️ 護盾音 + 🎉 勝利歡呼 → 真實 mp3 共 13 個 | ✅ |
 | **P21 SW 自動更新提示** | 🔄 受控更新（install 不 skipWaiting → waiting）+「🚀 有新版本！立即更新」橫幅 + 按鈕 postMessage(SKIP_WAITING) → controllerchange 重載；每小時背景 reg.update() | ✅ |
+| **v1.7.1 升版** | 頁尾署名改連阿凱老師教育科技創新專區（升版讓離線快取更新）（2026-11-17） | ✅ |
 
 ---
 
