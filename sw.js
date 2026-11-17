@@ -3,7 +3,9 @@
         靜態資源（圖示／manifest）用 cache-first。
    更新版本時把 VERSION bump 一碼即可讓全校裝置抓新版。 */
 const VERSION = "v1.7.1";
-const CACHE = "alien-invasion-" + VERSION;
+// 同網域（cagoooo.github.io）各工具共用快取空間，只清自己前綴的舊快取
+const CACHE_PREFIX = "alien-invasion-";
+const CACHE = CACHE_PREFIX + VERSION;
 const ASSETS = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./apple-touch-icon.png",
@@ -22,7 +24,7 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith(CACHE_PREFIX) && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
